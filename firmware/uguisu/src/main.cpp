@@ -137,16 +137,7 @@ void setup() {
   if (!g_store.begin()) system_off();
 
   load_provisioning();
-  // When on USB, always offer one 30s provisioning window (re-provision or first time).
-  if (immo::prov_is_vbus_present()) {
-    immo::prov_run_serial_loop(PROV_TIMEOUT_MS, on_provision_success);
-    load_provisioning();
-  }
-  // If still not provisioned (key all zeros) and on USB, stay in provisioning until PROV or unplug.
-  while (key_is_all_zeros() && immo::prov_is_vbus_present()) {
-    immo::prov_run_serial_loop(PROV_TIMEOUT_MS, on_provision_success);
-    load_provisioning();
-  }
+  immo::ensure_provisioned(PROV_TIMEOUT_MS, on_provision_success, load_provisioning, key_is_all_zeros);
 
   Serial.println("BOOTED:Uguisu");
   Bluefruit.begin();
@@ -179,3 +170,4 @@ void setup() {
 }
 
 void loop() {}
+
