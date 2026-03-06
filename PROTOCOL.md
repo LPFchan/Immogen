@@ -37,10 +37,10 @@ Receiver verifies: recomputes MIC over (device_id, counter, command) and compare
 
 ## Test vectors
 
-Use Guillemot’s `tools/test_vectors/gen_mic.py` with your PSK and company ID to generate payload + MIC for testing:
+Use ImmoCommon’s tools (shared submodule) with your PSK and company ID:
 
 ```bash
-python3 tools/test_vectors/gen_mic.py --company-id <YOUR_ID> --device-id 1 --counter 0 --command 1 --key <32 hex chars>
+python3 firmware/guillemot/lib/ImmoCommon/tools/test_vectors/gen_mic.py --company-id <YOUR_ID> --device-id 1 --counter 0 --command 1 --key <32 hex chars>
 ```
 
 Output includes `msd_company_plus_payload` (13 bytes) you can inject or compare against firmware.

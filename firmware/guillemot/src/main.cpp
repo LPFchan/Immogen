@@ -85,6 +85,19 @@ void buzzer_tone_ms(uint16_t duration_ms) {
   noTone(PIN_BUZZER);
 }
 
+[[noreturn]] void led_error_loop() {
+  if (PIN_ERROR_LED >= 0) {
+    pinMode(PIN_ERROR_LED, OUTPUT);
+    while (true) {
+      digitalWrite(PIN_ERROR_LED, HIGH);
+      delay(200);
+      digitalWrite(PIN_ERROR_LED, LOW);
+      delay(200);
+    }
+  }
+  while (true) delay(1000);
+}
+
 bool parse_payload_from_report(ble_gap_evt_adv_report_t* report, immo::Payload& out) {
   uint8_t msd[2 + immo::PAYLOAD_LEN];
   const uint8_t len = Bluefruit.Scanner.parseReportByType(report, BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, msd, sizeof(msd));
@@ -157,6 +170,7 @@ void setup() {
 
   if (!g_store.begin()) {
     Serial.println("InternalFS begin failed");
+    led_error_loop();
   }
 
   load_psk_from_storage();

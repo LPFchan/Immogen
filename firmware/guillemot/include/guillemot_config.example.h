@@ -25,3 +25,9 @@ static constexpr uint16_t BUZZER_LOCK_MS = 200;
 // Latch pulse widths
 static constexpr uint16_t LATCH_PULSE_MS = 15;
 
+// Error indicator: onboard LED for blink loop when InternalFS fails.
+// XIAO nRF52840 red LED is P0.26 (D2); set -1 if no LED.
+#ifndef PIN_ERROR_LED
+#define PIN_ERROR_LED 26
+#endif
+
