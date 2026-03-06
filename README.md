@@ -1,8 +1,8 @@
 # Guillemot — Ninebot G30 BLE Immobilizer Receiver
 
-Guillemot is the **deck receiver** module of a three-part immobilizer system (Uguisu fob + Guillemot receiver + Whimbrel web app) for the Ninebot Max G30. Guillemot validates short **encrypted BLE advertisements** from the fob and controls an **SR latch** that gates battery-to-ESC power (inline XT60 splice).
+Guillemot is the **deck receiver** module of a three-part immobilizer system ([Uguisu](https://github.com/LPFchan/Uguisu) fob + Guillemot receiver + [Whimbrel](https://github.com/LPFchan/Whimbrel) web app) for the Ninebot Max G30. Guillemot validates short **encrypted BLE advertisements** from the fob and controls an **SR latch** that gates battery-to-ESC power (inline XT60 splice).
 
-This repository contains the **Guillemot receiver firmware + hardware design files**.
+This repository contains the **Guillemot receiver firmware + hardware design files**. Note that shared protocol and cryptography logic is implemented in the [ImmoCommon](https://github.com/LPFchan/ImmoCommon) submodule.
 
 ## Hardware / Tech Stack
 
