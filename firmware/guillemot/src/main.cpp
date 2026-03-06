@@ -27,7 +27,7 @@ uint8_t g_psk[16];
 
 immo::CounterStore g_store(COUNTER_LOG_PATH, OLD_COUNTER_LOG_PATH, COUNTER_LOG_MAX_BYTES);
 
-bool on_provision_success(uint16_t device_id, const uint8_t key[16], uint32_t counter) {
+bool on_provision_success(const uint8_t key[16], uint32_t counter) {
   InternalFS.remove(PSK_STORAGE_PATH);
   Adafruit_LittleFS_Namespace::File f(InternalFS.open(PSK_STORAGE_PATH, FILE_O_WRITE));
   if (!f) return false;
@@ -47,6 +47,7 @@ bool on_provision_success(uint16_t device_id, const uint8_t key[16], uint32_t co
   InternalFS.remove(COUNTER_LOG_PATH);
   InternalFS.remove(OLD_COUNTER_LOG_PATH);
   memcpy(g_psk, key, 16);
+  g_store.seed(counter);
   return true;
 }
 
@@ -107,20 +108,19 @@ bool parse_payload_from_report(ble_gap_evt_adv_report_t* report, immo::Payload& 
   if (company_id != MSD_COMPANY_ID) return false;
 
   const uint8_t* p = msd + 2;
-  out.device_id = static_cast<uint16_t>(p[0] | (static_cast<uint16_t>(p[1]) << 8));
-  out.counter = static_cast<uint32_t>(p[2] | (static_cast<uint32_t>(p[3]) << 8) | (static_cast<uint32_t>(p[4]) << 16) |
-                                      (static_cast<uint32_t>(p[5]) << 24));
-  out.command = static_cast<immo::Command>(p[6]);
-  memcpy(out.mic, p + 7, immo::MIC_LEN);
+  out.counter = static_cast<uint32_t>(p[0] | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) |
+                                      (static_cast<uint32_t>(p[3]) << 24));
+  out.command = static_cast<immo::Command>(p[4]);
+  memcpy(out.mic, p + 5, immo::MIC_LEN);
   return true;
 }
 
 bool verify_payload(const immo::Payload& pl) {
   uint8_t nonce[immo::NONCE_LEN];
-  immo::build_nonce(pl.device_id, pl.counter, nonce);
+  immo::build_nonce(pl.counter, nonce);
 
   uint8_t msg[immo::MSG_LEN];
-  immo::build_msg(pl.device_id, pl.counter, pl.command, msg);
+  immo::build_msg(pl.counter, pl.command, msg);
 
   uint8_t expected[immo::MIC_LEN];
   if (!immo::ccm_mic_4(g_psk, nonce, msg, sizeof(msg), expected)) return false;
@@ -128,19 +128,19 @@ bool verify_payload(const immo::Payload& pl) {
 }
 
 void handle_valid_command(const immo::Payload& pl) {
-  const uint32_t last = g_store.lastCounterFor(pl.device_id);
+  const uint32_t last = g_store.lastCounter();
   if (pl.counter <= last) return;
 
   switch (pl.command) {
     case immo::Command::Unlock:
       latch_set_pulse();
       buzzer_tone_ms(BUZZER_UNLOCK_MS);
-      g_store.update(pl.device_id, pl.counter);
+      g_store.update(pl.counter);
       break;
     case immo::Command::Lock:
       buzzer_tone_ms(BUZZER_LOCK_MS);
       latch_reset_pulse();
-      g_store.update(pl.device_id, pl.counter);
+      g_store.update(pl.counter);
       break;
     default:
       break;
