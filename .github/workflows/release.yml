@@ -31,6 +31,6 @@ jobs:
           files: |
             firmware/uguisu/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.hex
             firmware/uguisu/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.zip
-          generate_release_notes: true
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
