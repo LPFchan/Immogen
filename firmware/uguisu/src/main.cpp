@@ -126,6 +126,22 @@ void system_off() {
   sd_power_system_off();
 }
 
+// Waits for button press and release, returns press duration in ms.
+// Button is active LOW (INPUT_PULLUP). Returns 0 if timeout.
+static uint32_t wait_for_button_press_release(uint32_t timeout_ms) {
+  const uint32_t deadline = millis() + timeout_ms;
+  while (millis() < deadline && digitalRead(UGUISU_PIN_BUTTON) != LOW) {
+    delay(10);
+  }
+  if (digitalRead(UGUISU_PIN_BUTTON) != LOW) return 0;
+
+  const uint32_t press_start = millis();
+  while (millis() < deadline && digitalRead(UGUISU_PIN_BUTTON) == LOW) {
+    delay(10);
+  }
+  return millis() - press_start;
+}
+
 }  // namespace
 
 void setup() {
@@ -144,10 +160,15 @@ void setup() {
   Bluefruit.setName("Uguisu");
   Bluefruit.setTxPower(0);
 
+  // Wait for button: single press = Unlock, long press (>= 2s) = Lock
+  const uint32_t press_ms = wait_for_button_press_release(10000);
+  if (press_ms == 0) system_off();  // No press within timeout, sleep
+  const immo::Command command =
+      (press_ms >= UGUISU_LONG_PRESS_MS) ? immo::Command::Lock : immo::Command::Unlock;
+
   const uint16_t device_id = g_device_id;
   const uint32_t last = g_store.loadLast();
   const uint32_t counter = last + 1;
-  const immo::Command command = immo::Command::Unlock;
 
   uint8_t nonce[immo::NONCE_LEN];
   immo::build_nonce(device_id, counter, nonce);

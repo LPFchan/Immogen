@@ -17,3 +17,6 @@
 // How often to send advertisement packets while active (ms).
 #define UGUISU_ADV_INTERVAL_MS 100
 
+// Long-press threshold for lock command (ms). Press >= this = Lock, else Unlock.
+#define UGUISU_LONG_PRESS_MS 2000
+
