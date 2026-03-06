@@ -1,0 +1,16 @@
+.DS_Store
+
+# KiCad / EDA artifacts
+*.kicad_prl
+fp-info-cache
+**/_autosave-*.kicad_pcb
+**/~*.lck
+**/*-backups/
+
+# PlatformIO
+**/.pio/
+**/.vscode/
+
+# Firmware secrets (never commit)
+**/guillemot_secrets_local.h
+
