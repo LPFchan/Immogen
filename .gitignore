@@ -8,3 +8,10 @@ fp-info-cache
 **/*-backups/
 Uguisu-backups/
 
+# PlatformIO / VSCode
+**/.pio/
+**/.vscode/
+
+# Firmware secrets (never commit)
+**/uguisu_secrets_local.h
+
