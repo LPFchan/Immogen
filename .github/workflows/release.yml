@@ -1,4 +1,6 @@
 # Build firmware and create a GitHub release when a version tag (v*) is pushed.
+# Requires repo secret RELEASE_TOKEN: a Personal Access Token (classic) with "repo" scope.
+# Create at: GitHub → Settings → Developer settings → PATs. Add under repo Settings → Secrets → Actions.
 name: Release
 
 on:
@@ -9,8 +11,6 @@ on:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # required for creating releases and uploading assets
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,4 +35,4 @@ jobs:
             firmware/uguisu/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.zip
           generate_release_notes: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
