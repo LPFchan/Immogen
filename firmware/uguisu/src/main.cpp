@@ -155,7 +155,7 @@ void setup() {
   Bluefruit.setName("Uguisu");
   Bluefruit.setTxPower(0);
 
-  // Wait for button: single press = Unlock, long press (>= 2s) = Lock
+  // Wait for button: single press = Unlock, long press (>= 1s) = Lock
   const uint32_t press_ms = wait_for_button_press_release(10000);
   if (press_ms == 0) system_off();  // No press within timeout, sleep
   const immo::Command command =
