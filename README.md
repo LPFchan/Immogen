@@ -17,17 +17,16 @@ The firmware is a [PlatformIO](https://platformio.org/) project located in `firm
 - **Boot Routine**: Checks `VBUSDETECT`. If USB is connected, it enters Whimbrel Provisioning Mode. If battery powered, it initializes BLE, reads/increments the counter in NVS, generates the AES-128-CCM payload, broadcasts for ~2 seconds, and then enters deep sleep (`sd_power_system_off`).
 - **Locking**: A lock command requires a 2-second long press.
 
-## Provisioning
-
-Uguisu must be initialized with the [Whimbrel](https://github.com/LPFchan/Whimbrel) web app.
-- Connect the fob via USB and use Whimbrel to inject a shared AES-128 key over Web Serial.
-- This enforces physical presence, preventing over-the-air pairing interception.
-- The key and anti-replay counter are stored persistently in internal flash (NVS/FDS). Firmware is compiled without any serial commands capable of reading the key back to the host.
-
 ## Protocol
 
 - **BLE**: Advertisement-based with no persistent connection. Broadcasts Manufacturer Specific Data containing a 2-byte device ID, 4-byte monotonic anti-replay counter, 1-byte command (0x01=unlock, 0x02=lock), and 4-byte AES-CCM Message Integrity Code (MIC).
 - **Shared Library**: Payload generation and cryptography are handled by [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
+
+## Onboarding
+
+Uguisu is initialized with the [Whimbrel](https://github.com/LPFchan/Whimbrel) web app.
+- **Firmware Flashing**: Whimbrel also features a web-based firmware flasher. You can flash the latest release directly from your browser via Web Serial by placing the device in Bootloader mode (double-tap reset).
+- **Key Provisioning**: Connect the fob via USB and use Whimbrel to inject a shared AES-128 key over Web Serial. This enforces physical presence, preventing over-the-air pairing interception. The key and anti-replay counter are stored persistently in internal flash (NVS/FDS). Firmware is compiled without any serial commands capable of reading the key back to the host.
 
 ## Safety & Notes
 
