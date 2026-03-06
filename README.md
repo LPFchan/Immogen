@@ -18,6 +18,10 @@ ImmoCommon handles:
 
 ImmoCommon is included as a **Git Submodule** in both the `Uguisu` and `Guillemot` repositories.
 
+### Test vectors
+
+`tools/test_vectors/gen_mic.py` generates AES-128-CCM MIC test payloads for firmware development. See [tools/test_vectors/README.md](tools/test_vectors/README.md) for usage.
+
 ### Firmware inclusion
 
 In PlatformIO projects, it is included in the `lib/` directory or referenced directly in `platformio.ini`.
