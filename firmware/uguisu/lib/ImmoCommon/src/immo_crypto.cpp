@@ -1,20 +1,32 @@
-#include "uguisu_protocol.h"
-
-#include <Arduino.h>
-
+#include "immo_crypto.h"
 #include <nrf_soc.h>
+#include <string.h>
 
-namespace uguisu {
+#ifndef min
+#define min(a,b) ((a)<(b)?(a):(b))
+#endif
+
+namespace immo {
 namespace {
+
+void le16_write(uint8_t out[2], uint16_t x) {
+  out[0] = static_cast<uint8_t>(x & 0xFF);
+  out[1] = static_cast<uint8_t>((x >> 8) & 0xFF);
+}
+
+void le32_write(uint8_t out[4], uint32_t x) {
+  out[0] = static_cast<uint8_t>(x & 0xFF);
+  out[1] = static_cast<uint8_t>((x >> 8) & 0xFF);
+  out[2] = static_cast<uint8_t>((x >> 16) & 0xFF);
+  out[3] = static_cast<uint8_t>((x >> 24) & 0xFF);
+}
 
 bool aes128_ecb_encrypt(const uint8_t key[16], const uint8_t in[16], uint8_t out[16]) {
   nrf_ecb_hal_data_t ecb{};
   memcpy(ecb.key, key, 16);
   memcpy(ecb.cleartext, in, 16);
-
   const uint32_t err = sd_ecb_block_encrypt(&ecb);
   if (err != NRF_SUCCESS) return false;
-
   memcpy(out, ecb.ciphertext, 16);
   return true;
 }
@@ -24,6 +36,18 @@ void xor_block(uint8_t dst[16], const uint8_t a[16], const uint8_t b[16]) {
 }
 
 }  // namespace
+
+void build_nonce(uint16_t device_id, uint32_t counter, uint8_t nonce[NONCE_LEN]) {
+  le16_write(&nonce[0], device_id);
+  le32_write(&nonce[2], counter);
+  for (size_t i = 6; i < NONCE_LEN; i++) nonce[i] = 0;
+}
+
+void build_msg(uint16_t device_id, uint32_t counter, Command command, uint8_t msg[MSG_LEN]) {
+  le16_write(&msg[0], device_id);
+  le32_write(&msg[2], counter);
+  msg[6] = static_cast<uint8_t>(command);
+}
 
 bool ccm_mic_4(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], const uint8_t* msg, size_t msg_len, uint8_t out_mic[MIC_LEN]) {
   if (msg_len > 0xFFFFu) return false;
@@ -66,5 +90,10 @@ bool ccm_mic_4(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], const uint
   return true;
 }
 
-}  // namespace uguisu
+bool constant_time_eq(const uint8_t* a, const uint8_t* b, size_t n) {
+  uint8_t diff = 0;
+  for (size_t i = 0; i < n; i++) diff |= (a[i] ^ b[i]);
+  return diff == 0;
+}
 
+}  // namespace immo

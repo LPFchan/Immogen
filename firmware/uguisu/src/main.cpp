@@ -7,7 +7,7 @@
 #include <InternalFileSystem.h>
 
 #include "uguisu_config.h"
-#include "uguisu_protocol.h"
+#include <ImmoCommon.h>
 
 using namespace Adafruit_LittleFS_Namespace;
 
@@ -17,11 +17,10 @@ namespace {
 static constexpr uint8_t k_default_psk[16] = {0};
 
 static constexpr const char* COUNTER_LOG_PATH = "/ug_ctr.log";
+static constexpr const char* OLD_COUNTER_LOG_PATH = "/ug_ctr.old";
 static constexpr const char* PROV_STORAGE_PATH = "/ug_prov.bin";
 static constexpr size_t COUNTER_LOG_MAX_BYTES = 4096;
-static constexpr size_t PROV_TIMEOUT_MS = 30000;
-static constexpr size_t PROV_KEY_HEX_LEN = 32;
-static constexpr size_t PROV_COUNTER_HEX_LEN = 8;
+static constexpr uint32_t PROV_TIMEOUT_MS = 30000;
 static constexpr uint32_t PROV_MAGIC = 0x76704755u;  // "UGpv" LE
 
 // Runtime key and device_id: from Whimbrel provisioned flash or compile-time default.
@@ -29,269 +28,44 @@ uint8_t g_psk[16];
 uint16_t g_device_id = UGUISU_DEVICE_ID;
 bool g_has_provisioning = false;
 
-struct CounterRecord {
-  uint32_t counter;
-  uint32_t crc32;
-};
+immo::CounterStore g_store(COUNTER_LOG_PATH, OLD_COUNTER_LOG_PATH, COUNTER_LOG_MAX_BYTES);
 
-uint32_t crc32_ieee(const uint8_t* data, size_t len) {
-  uint32_t crc = 0xFFFFFFFFu;
-  for (size_t i = 0; i < len; i++) {
-    crc ^= data[i];
-    for (int b = 0; b < 8; b++) {
-      const uint32_t mask = -(crc & 1u);
-      crc = (crc >> 1) ^ (0xEDB88320u & mask);
-    }
+// Callback for provisioning success
+bool on_provision_success(uint16_t device_id, const uint8_t key[16], uint32_t counter) {
+  InternalFS.remove(PROV_STORAGE_PATH);
+  Adafruit_LittleFS_Namespace::File f(InternalFS.open(PROV_STORAGE_PATH, FILE_O_WRITE));
+  if (!f) return false;
+  
+  f.write(reinterpret_cast<const uint8_t*>(&PROV_MAGIC), 4);
+  f.write(key, 16);
+  f.write(reinterpret_cast<const uint8_t*>(&device_id), 2);
+  f.write(reinterpret_cast<const uint8_t*>(&counter), 4);
+  f.flush();
+  f.close();
+
+  // Verify
+  Adafruit_LittleFS_Namespace::File fr(InternalFS.open(PROV_STORAGE_PATH, FILE_O_READ));
+  if (!fr || fr.size() < 22) return false;
+  
+  uint32_t read_magic = 0;
+  uint8_t read_key[16];
+  uint16_t read_device_id = 0;
+  if (fr.read(reinterpret_cast<uint8_t*>(&read_magic), 4) != 4 ||
+      read_magic != PROV_MAGIC ||
+      fr.read(read_key, 16) != 16 ||
+      fr.read(reinterpret_cast<uint8_t*>(&read_device_id), 2) != 2) {
+    return false;
   }
-  return ~crc;
-}
-
-uint32_t record_crc(const CounterRecord& r) {
-  return crc32_ieee(reinterpret_cast<const uint8_t*>(&r.counter), sizeof(r.counter));
-}
-
-class CounterStore {
-public:
-  bool begin() { return InternalFS.begin(); }
-
-  uint32_t loadLast() {
-    uint32_t last = 0;
-    Adafruit_LittleFS_Namespace::File f(InternalFS.open(COUNTER_LOG_PATH, FILE_O_READ));
-    if (!f) return last;
-
-    CounterRecord rec{};
-    while (f.read(reinterpret_cast<void*>(&rec), sizeof(rec)) == sizeof(rec)) {
-      if (record_crc(rec) != rec.crc32) continue;
-      last = rec.counter;
-    }
-    return last;
+  
+  if (!immo::constant_time_eq(read_key, key, 16) || read_device_id != device_id) {
+    return false;
   }
 
-  void append(uint32_t counter) {
-    rotateIfNeeded_();
-
-    CounterRecord rec{};
-    rec.counter = counter;
-    rec.crc32 = record_crc(rec);
-
-    Adafruit_LittleFS_Namespace::File f(InternalFS.open(COUNTER_LOG_PATH, FILE_O_WRITE));
-    if (!f) return;
-    f.write(reinterpret_cast<const uint8_t*>(&rec), sizeof(rec));
-    f.flush();
-  }
-
-  // Clear log and write a single record (used after Whimbrel provisioning).
-  void seed(uint32_t counter) {
-    InternalFS.remove(COUNTER_LOG_PATH);
-    InternalFS.remove("/ug_ctr.old");
-    append(counter);
-  }
-
-private:
-  void rotateIfNeeded_() {
-    Adafruit_LittleFS_Namespace::File f(InternalFS.open(COUNTER_LOG_PATH, FILE_O_READ));
-    if (!f) return;
-    const size_t sz = f.size();
-    f.close();
-
-    if (sz < COUNTER_LOG_MAX_BYTES) return;
-    InternalFS.remove("/ug_ctr.old");
-    InternalFS.rename(COUNTER_LOG_PATH, "/ug_ctr.old");
-  }
-};
-
-CounterStore g_store;
-
-// --- Whimbrel provisioning (Web Serial PROV: line, 30s timeout) ---
-
-static bool prov_is_vbus_present() {
-#if defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
-  return (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) != 0;
-#else
-  return false;
-#endif
-}
-
-static bool hex_byte(const char* hex, uint8_t* out) {
-  auto nib = [](char c) -> int {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-  };
-  int hi = nib(hex[0]);
-  int lo = nib(hex[1]);
-  if (hi < 0 || lo < 0) return false;
-  *out = static_cast<uint8_t>((hi << 4) | lo);
+  g_store.seed(device_id, counter);
+  memcpy(g_psk, key, 16);
+  g_device_id = device_id;
+  g_has_provisioning = true;
   return true;
-}
-
-// Parse device_id string e.g. "UGUISU_01" -> 1. Returns 0xFFFF on parse error.
-static uint16_t prov_parse_device_id(const char* dev_id, size_t len) {
-  const char* p = dev_id;
-  while (len > 0 && *p != '_') {
-    p++;
-    len--;
-  }
-  if (len == 0 || *p != '_') return 0xFFFF;
-  p++;
-  len--;
-  unsigned int val = 0;
-  for (; len > 0 && *p; p++, len--) {
-    if (*p < '0' || *p > '9') return 0xFFFF;
-    val = val * 10 + (unsigned int)(*p - '0');
-  }
-  return val > 0xFFFF ? 0xFFFF : static_cast<uint16_t>(val);
-}
-
-// Parse 8 hex chars to uint32_t. Returns true on success.
-static bool parse_counter_hex(const char* hex, uint32_t* out) {
-  uint32_t val = 0;
-  for (int i = 0; i < 8; i++) {
-    int nib = -1;
-    if (hex[i] >= '0' && hex[i] <= '9') nib = hex[i] - '0';
-    else if (hex[i] >= 'A' && hex[i] <= 'F') nib = hex[i] - 'A' + 10;
-    else if (hex[i] >= 'a' && hex[i] <= 'f') nib = hex[i] - 'a' + 10;
-    if (nib < 0) return false;
-    val = (val << 4) | (uint32_t)nib;
-  }
-  *out = val;
-  return true;
-}
-
-// CRC-16-CCITT (poly 0x1021, init 0xFFFF) over data. Used for PROV checksum.
-static uint16_t crc16_ccitt(const uint8_t* data, size_t len) {
-  uint16_t crc = 0xFFFFu;
-  for (size_t i = 0; i < len; i++) {
-    crc ^= (uint16_t)data[i] << 8;
-    for (int k = 0; k < 8; k++)
-      crc = (crc & 0x8000u) ? (uint16_t)((crc << 1) ^ 0x1021u) : (uint16_t)(crc << 1);
-  }
-  return crc;
-}
-
-// Wait for "PROV:DEVICE_ID:KEY_HEX:COUNTER_HEX:CHECKSUM_HEX". CHECKSUM is CRC-16-CCITT of key (4 hex chars).
-// On success write /ug_prov.bin, seed counter log, send ACK, return true.
-static bool prov_run_serial_loop() {
-  const uint32_t deadline = millis() + PROV_TIMEOUT_MS;
-  char line[128];
-  size_t len = 0;
-
-  while (millis() < deadline && len < sizeof(line) - 1) {
-    if (!Serial.available()) {
-      delay(10);
-      continue;
-    }
-    int c = Serial.read();
-    if (c < 0) continue;
-    if (c == '\n' || c == '\r') {
-      line[len] = '\0';
-      if (len == 0) continue;
-
-      if (strncmp(line, "PROV:", 5) != 0) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-      const char* rest = line + 5;
-      const char* col1 = strchr(rest, ':');
-      const char* col2 = col1 ? strchr(col1 + 1, ':') : nullptr;
-      const char* col3 = col2 ? strchr(col2 + 1, ':') : nullptr;
-      if (!col1 || !col2 || !col3) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-      size_t dev_id_len = (size_t)(col1 - rest);
-      const char* key_hex = col1 + 1;
-      const char* counter_hex = col2 + 1;
-      const char* checksum_hex = col3 + 1;
-      size_t key_len = (size_t)(col2 - key_hex);
-      size_t counter_len = (size_t)(col3 - counter_hex);
-      if (key_len != PROV_KEY_HEX_LEN || counter_len != PROV_COUNTER_HEX_LEN) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-      if (strlen(checksum_hex) < 4) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-
-      uint16_t device_id = prov_parse_device_id(rest, dev_id_len);
-      if (device_id == 0xFFFF) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-
-      uint8_t key_buf[16];
-      for (size_t i = 0; i < 16; i++) {
-        if (!hex_byte(key_hex + i * 2, &key_buf[i])) {
-          Serial.println("ERR:MALFORMED");
-          return false;
-        }
-      }
-      uint32_t counter_val;
-      if (!parse_counter_hex(counter_hex, &counter_val)) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-
-      uint8_t checksum_hi = 0, checksum_lo = 0;
-      if (!hex_byte(checksum_hex, &checksum_hi) || !hex_byte(checksum_hex + 2, &checksum_lo)) {
-        Serial.println("ERR:MALFORMED");
-        return false;
-      }
-      uint16_t checksum_received = (uint16_t)checksum_hi << 8 | checksum_lo;
-      if (crc16_ccitt(key_buf, 16) != checksum_received) {
-        Serial.println("ERR:CHECKSUM");
-        return false;
-      }
-
-      InternalFS.remove(PROV_STORAGE_PATH);
-      Adafruit_LittleFS_Namespace::File f(InternalFS.open(PROV_STORAGE_PATH, FILE_O_WRITE));
-      if (!f) {
-        Serial.println("ERR:WRITE");
-        return false;
-      }
-      f.write(reinterpret_cast<const uint8_t*>(&PROV_MAGIC), 4);
-      f.write(key_buf, 16);
-      f.write(reinterpret_cast<const uint8_t*>(&device_id), 2);
-      f.write(reinterpret_cast<const uint8_t*>(&counter_val), 4);
-      f.flush();
-      f.close();
-
-      // Verify: read back and compare key + device_id.
-      Adafruit_LittleFS_Namespace::File fr(InternalFS.open(PROV_STORAGE_PATH, FILE_O_READ));
-      if (!fr || fr.size() < 22) {
-        Serial.println("ERR:VERIFY_FAIL");
-        return false;
-      }
-      uint32_t read_magic = 0;
-      uint8_t read_key[16];
-      uint16_t read_device_id = 0;
-      if (fr.read(reinterpret_cast<uint8_t*>(&read_magic), 4) != 4 ||
-          read_magic != PROV_MAGIC ||
-          fr.read(read_key, 16) != 16 ||
-          fr.read(reinterpret_cast<uint8_t*>(&read_device_id), 2) != 2) {
-        Serial.println("ERR:VERIFY_FAIL");
-        return false;
-      }
-      bool key_ok = true;
-      for (int i = 0; i < 16; i++)
-        if (read_key[i] != key_buf[i]) { key_ok = false; break; }
-      if (!key_ok || read_device_id != device_id) {
-        Serial.println("ERR:VERIFY_FAIL");
-        return false;
-      }
-
-      g_store.seed(counter_val);
-      memcpy(g_psk, key_buf, 16);
-      g_device_id = device_id;
-      g_has_provisioning = true;
-      Serial.println("ACK:PROV_SUCCESS");
-      return true;
-    }
-    line[len++] = (char)c;
-  }
-  return false;
 }
 
 static bool key_is_all_zeros() {
@@ -326,11 +100,11 @@ static void load_provisioning() {
   g_has_provisioning = true;
 }
 
-void start_advertising_once(uint16_t company_id, const uint8_t payload11[uguisu::PAYLOAD_LEN]) {
-  uint8_t msd[2 + uguisu::PAYLOAD_LEN];
+void start_advertising_once(uint16_t company_id, const uint8_t payload11[immo::PAYLOAD_LEN]) {
+  uint8_t msd[2 + immo::PAYLOAD_LEN];
   msd[0] = static_cast<uint8_t>(company_id & 0xFF);
   msd[1] = static_cast<uint8_t>((company_id >> 8) & 0xFF);
-  memcpy(&msd[2], payload11, uguisu::PAYLOAD_LEN);
+  memcpy(&msd[2], payload11, immo::PAYLOAD_LEN);
 
   Bluefruit.Advertising.stop();
   Bluefruit.Advertising.clearData();
@@ -364,13 +138,13 @@ void setup() {
 
   load_provisioning();
   // When on USB, always offer one 30s provisioning window (re-provision or first time).
-  if (prov_is_vbus_present()) {
-    prov_run_serial_loop();
+  if (immo::prov_is_vbus_present()) {
+    immo::prov_run_serial_loop(PROV_TIMEOUT_MS, on_provision_success);
     load_provisioning();
   }
   // If still not provisioned (key all zeros) and on USB, stay in provisioning until PROV or unplug.
-  while (key_is_all_zeros() && prov_is_vbus_present()) {
-    prov_run_serial_loop();
+  while (key_is_all_zeros() && immo::prov_is_vbus_present()) {
+    immo::prov_run_serial_loop(PROV_TIMEOUT_MS, on_provision_success);
     load_provisioning();
   }
 
@@ -382,19 +156,19 @@ void setup() {
   const uint16_t device_id = g_device_id;
   const uint32_t last = g_store.loadLast();
   const uint32_t counter = last + 1;
-  const uguisu::Command command = uguisu::Command::Unlock;
+  const immo::Command command = immo::Command::Unlock;
 
-  uint8_t nonce[uguisu::NONCE_LEN];
-  uguisu::build_nonce(device_id, counter, nonce);
+  uint8_t nonce[immo::NONCE_LEN];
+  immo::build_nonce(device_id, counter, nonce);
 
-  uint8_t msg[uguisu::MSG_LEN];
-  uguisu::build_msg(device_id, counter, command, msg);
+  uint8_t msg[immo::MSG_LEN];
+  immo::build_msg(device_id, counter, command, msg);
 
-  uint8_t mic[uguisu::MIC_LEN];
-  const bool ok = uguisu::ccm_mic_4(g_psk, nonce, msg, sizeof(msg), mic);
+  uint8_t mic[immo::MIC_LEN];
+  const bool ok = immo::ccm_mic_4(g_psk, nonce, msg, sizeof(msg), mic);
   if (!ok) system_off();
 
-  uint8_t payload11[uguisu::PAYLOAD_LEN];
+  uint8_t payload11[immo::PAYLOAD_LEN];
   memcpy(&payload11[0], msg, sizeof(msg));
   memcpy(&payload11[sizeof(msg)], mic, sizeof(mic));
 
@@ -405,4 +179,3 @@ void setup() {
 }
 
 void loop() {}
-
