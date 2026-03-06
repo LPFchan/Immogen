@@ -33,6 +33,13 @@ Create `firmware/uguisu/include/uguisu_secrets_local.h` (gitignored) and define 
   0x0D, 0x0E, 0x0F, 0x10
 ```
 
+### Whimbrel provisioning
+
+Uguisu is compatible with [Whimbrel](https://github.com/LPFchan/Whimbrel), a browser-based provisioning app that injects the same AES key and counter into the fob and the receiver over Web Serial.
+
+- **When powered over USB:** On boot, Uguisu checks for VBUS. If present, it waits up to 30 seconds for a line `PROV:DEVICE_ID:KEY_HEX:COUNTER_HEX` (e.g. `PROV:UGUISU_01:<32 hex chars>:00000000`). On success it writes the key and device ID to internal flash, seeds the anti-replay counter log, and replies `ACK:PROV_SUCCESS`. If no valid line is received, it continues to normal operation (one-shot advertise then system off).
+- **Runtime:** If `/ug_prov.bin` exists from a prior Whimbrel session, the fob uses that key and device ID instead of compile-time `UGUISU_PSK` / `UGUISU_DEVICE_ID`. The device ID string (e.g. `UGUISU_01`) is parsed to a 16-bit value for the BLE payload (e.g. `01` → 1).
+
 ### Protocol compatibility (Uguisu ↔ Guillemot)
 
 The fob transmits manufacturer-specific data containing:
