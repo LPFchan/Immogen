@@ -20,17 +20,16 @@ The firmware is a [PlatformIO](https://platformio.org/) project located in `firm
 - **Scanning**: Uses duty-cycled scanning (20 ms scan every 2 seconds) to conserve power.
 - **Validation**: Rejects payloads with invalid AES-CCM MICs or counters less than or equal to the last seen counter (anti-replay).
 
-## Provisioning
-
-Guillemot must be initialized with the [Whimbrel](https://github.com/LPFchan/Whimbrel) web app.
-- Connect the receiver via USB and use Whimbrel to inject a shared AES-128 key over Web Serial.
-- This enforces physical presence, preventing over-the-air pairing interception.
-- The key and anti-replay counter log are stored persistently in internal flash. Firmware is compiled without any serial commands capable of reading the key back to the host.
-
 ## Protocol
 
 - **BLE**: Advertisement-based. Listens for Manufacturer Specific Data containing a 2-byte device ID, 4-byte monotonic counter, 1-byte command (0x01=unlock, 0x02=lock), and 4-byte AES-CCM Message Integrity Code (MIC).
 - **Shared Library**: Payload validation and cryptography are handled by [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
+
+## Onboarding
+
+Guillemot is initialized with the [Whimbrel](https://github.com/LPFchan/Whimbrel) web app.
+- **Firmware Flashing**: Whimbrel also features a web-based firmware flasher. You can flash the latest release directly from your browser via Web Serial by placing the device in Bootloader mode (double-tap reset).
+- **Key Provisioning**: Connect the receiver via USB and use Whimbrel to inject a shared AES-128 key over Web Serial. This enforces physical presence, preventing over-the-air pairing interception. The key and anti-replay counter log are stored persistently in internal flash. Firmware is compiled without any serial commands capable of reading the key back to the host.
 
 ## Safety & Notes
 
