@@ -12,21 +12,23 @@ Mount Guillemot on the plastic underside of the deck for good 2.4 GHz RF.
 
 ### Components & BOM (~$25–30)
 
-| Ref    | Part               | Notes                                                             | LCSC             | Cost   |
-| ------ | ------------------ | ----------------------------------------------------------------- | ---------------- | ------ |
-| U1     | XIAO nRF52840      | MCU: BLE scanning, latch control, buzzer PWM                      | Seeed/Amazon     | $6.00  |
-| PS1    | TPSM365R6V3RDNR    | Buck: 3–65 V in, 3.3 V/600 mA, 4 μA Iq. Feeds XIAO 3V3 directly.  | C18208843        | $4.30  |
-| Q1     | IPB042N10N3G       | Main MOSFET: 100 V/137 A, D2PAK, low-side GND return              | C69300           | $1.36  |
-| U2     | SN74LVC2G02DCTR    | SR latch: Q = unlock. 10 nF + 100 kΩ differentiator for POR pulse | C94600           | $0.50  |
-| Q2     | AO3422             | Pre-charge FET, inrush ~0.8 A. Driven by latch Q.                | C37130           | —      |
-| R8     | 47 Ω 2 W           | Pre-charge resistor                                               | C136992          | $0.03  |
-| Q4     | 2N7002             | Gate drive                                                        | C8545            | —      |
-| —      | 100 kΩ + 1 μF      | RC delay τ = 100 ms. 1N4148W bypass for fast turn-off             | JLCPCB Basic     | —      |
-| —      | 1N4148W + 1 μF     | Gate isolation from buzzer rail sag                               | JLCPCB Basic     | —      |
-| BZ1    | FUET-1230          | Buzzer: 12×12×3 mm SMD, 4 kHz. Driven by MMBT3904                  | C391037          | $0.22  |
-| Q3     | SI2309CDS          | Bleeder P-FET: disconnects 10 kΩ bleeder when locked (0 μA)       | C10493           | $0.10  |
-| TP1–5  | XT60 + 12 AWG      | Pigtails and GND jumper                                           | Generic          | ~$2    |
-| —      | PCB 5×             | 54×34 mm, 2 oz outer                                              | JLCPCB           | $10–15 |
+
+| Ref   | Part            | Notes                                                             | LCSC         | Cost   |
+| ----- | --------------- | ----------------------------------------------------------------- | ------------ | ------ |
+| U1    | XIAO nRF52840   | MCU: BLE scanning, latch control, buzzer PWM                      | Seeed/Amazon | $6.00  |
+| PS1   | TPSM365R6V3RDNR | Buck: 3–65 V in, 3.3 V/600 mA, 4 μA Iq. Feeds XIAO 3V3 directly.  | C18208843    | $4.30  |
+| Q1    | IPB042N10N3G    | Main MOSFET: 100 V/137 A, D2PAK, low-side GND return              | C69300       | $1.36  |
+| U2    | SN74LVC2G02DCTR | SR latch: Q = unlock. 10 nF + 100 kΩ differentiator for POR pulse | C94600       | $0.50  |
+| Q2    | AO3422          | Pre-charge FET, inrush ~0.8 A. Driven by latch Q.                 | C37130       | —      |
+| R8    | 47 Ω 2 W        | Pre-charge resistor                                               | C136992      | $0.03  |
+| Q4    | 2N7002          | Gate drive                                                        | C8545        | —      |
+| —     | 100 kΩ + 1 μF   | RC delay τ = 100 ms. 1N4148W bypass for fast turn-off             | JLCPCB Basic | —      |
+| —     | 1N4148W + 1 μF  | Gate isolation from buzzer rail sag                               | JLCPCB Basic | —      |
+| BZ1   | FUET-1230       | Buzzer: 12×12×3 mm SMD, 4 kHz. Driven by MMBT3904                 | C391037      | $0.22  |
+| Q3    | SI2309CDS       | Bleeder P-FET: disconnects 10 kΩ bleeder when locked (0 μA)       | C10493       | $0.10  |
+| TP1–5 | XT60 + 12 AWG   | Pigtails and GND jumper                                           | Generic      | —      |
+| —     | PCB 5×          | 54×34 mm, 2 oz outer                                              | JLCPCB       | $10–15 |
+
 
 JLCPCB P&P for SMT. Hand-solder XIAO edges, XT60 pigtails, and the GND jumper.
 
@@ -86,3 +88,4 @@ Use [Whimbrel](https://github.com/LPFchan/Whimbrel) for both tasks:
 - Do not test lock behavior while riding.
 - Not affiliated with Segway-Ninebot.
 - Avoid committing KiCad per-user state (`*.kicad_prl`) or lock files.
+
