@@ -1,35 +1,64 @@
 # Uguisu — Ninebot G30 BLE Immobilizer Fob
 
-Uguisu is the **BLE key fob** module of a three-part immobilizer system (Uguisu fob + [Guillemot](https://github.com/LPFchan/Guillemot) receiver + [Whimbrel](https://github.com/LPFchan/Whimbrel) web app) for the Ninebot Max G30. It broadcasts short, encrypted BLE advertisements on button press to unlock or lock the scooter.
+Uguisu is the BLE key fob in a three-part immobilizer system ([Guillemot](https://github.com/LPFchan/Guillemot) receiver + [Whimbrel](https://github.com/LPFchan/Whimbrel) web app) for the Ninebot Max G30. It broadcasts short, encrypted BLE advertisements on button press to unlock or lock the vehicle. This repository contains the fob firmware and hardware design files. Protocol and cryptography via [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
 
-This repository contains the **Uguisu fob firmware and hardware design files**. Note that shared protocol and cryptography logic is implemented in the [ImmoCommon](https://github.com/LPFchan/ImmoCommon) submodule.
+---
 
 ## Hardware
 
-- **MCU**: Seeed Studio XIAO nRF52840 (Castellated, 21×17.5 mm)
-- **Power**: 100 mAh 3.7 V LiPo soldered to the XIAO bottom pads. Uses < 5 μA in standby (12–18 months between charges).
-- **Input**: Side-actuated SMD tact switch.
-- **PCB Design**: KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
+### Components & BOM (~$10)
 
-## Firmware
+| Ref   | Part               | Notes                         | Source       | Cost   |
+| ----- | ------------------ | ----------------------------- | ------------ | ------ |
+| U1    | XIAO nRF52840      | Castellated, 21×17.5 mm       | Seeed/Amazon | $6.00  |
+| BAT   | 100 mAh 3.7 V LiPo | Solder pads on XIAO bottom    | Generic      | $2.00  |
+| SW1   | Tact switch        | Side-actuated, SMD            | Generic      | $0.10  |
+| —     | Enclosure          | ~35×25×12 mm, 3D-printed      | Local        | ~$1.00 |
 
-The firmware is a [PlatformIO](https://platformio.org/) project located in `firmware/uguisu/`.
-- **Boot Routine**: Checks `VBUSDETECT`. If USB is connected, it enters Whimbrel Provisioning Mode. If battery powered, it initializes BLE, reads/increments the counter in NVS, generates the AES-128-CCM payload, broadcasts for ~2 seconds, and then enters deep sleep (`sd_power_system_off`). The next button press wakes the MCU via GPIO (hardware SENSE); the device then boots and again waits for a press.
-- **Locking**: A lock command requires a 1-second long press.
+Hand-solder XIAO, LiPo, and tact switch.
 
-## Protocol
+### PCB Design
 
-- **BLE**: Advertisement-based with no persistent connection. Broadcasts Manufacturer Specific Data containing a 4-byte monotonic anti-replay counter, 1-byte command (0x01=unlock, 0x02=lock), and 4-byte AES-CCM Message Integrity Code (MIC).
-- **Shared Library**: Payload generation and cryptography are handled by [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
+KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
 
-## Onboarding
+### Operation
 
-Uguisu is initialized with the [Whimbrel](https://github.com/LPFchan/Whimbrel) web app.
-- **Firmware Flashing**: Whimbrel also features a web-based firmware flasher. You can flash the latest release directly from your browser via Web Serial by placing the device in Bootloader mode (double-tap reset).
-- **Key Provisioning**: Connect the fob via USB and use Whimbrel to inject a shared AES-128 key over Web Serial. This enforces physical presence, preventing over-the-air pairing interception. The key and anti-replay counter are stored persistently in internal flash (NVS/FDS). Firmware is compiled without any serial commands capable of reading the key back to the host.
+- **Unlock flow:** Button press → GPIO wake → boot → init BLE → read/increment NVS → AES-128-CCM → broadcast ~2 s → sleep QSPI (0xB9) → `sd_power_system_off()`.
+- **Lock flow:** 1-second long press → same sequence, command 0x02.
+- **Power:** < 5 μA standby, ~0.004 mAh per press (12–18 months between charges on 100 mAh LiPo). Charging via USB-C.
+
+### Design Notes
+
+- **NVS wear:** Counter written every press (System OFF kills RAM). At 10 unlocks/day, ~2.7 years; wear-leveling extends this.
+
+---
+
+## Software
+
+### Firmware
+
+[PlatformIO](https://platformio.org/) project in `firmware/uguisu/`.
+
+Boot routine checks `NRF_POWER->USBREGSTATUS` (`VBUSDETECT`). If USB connected: enters Whimbrel Provisioning Mode (waits for serial payload). If battery powered: full reset → BLE init → NVS read/increment/persist → AES-128-CCM → broadcast ~2 s → sleep QSPI flash (0xB9) → `sd_power_system_off()`. Next press wakes via GPIO (hardware SENSE).
+
+### Protocol
+
+- Advertisement-based BLE (no persistent connection).
+- Payload: 4-byte monotonic counter, 1-byte command (0x01 = unlock, 0x02 = lock), 4-byte AES-CCM MIC.
+- Generation and crypto via [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
+
+### Onboarding
+
+Use [Whimbrel](https://github.com/LPFchan/Whimbrel) for both tasks:
+
+- **Firmware flashing:** Web-based flasher via Web Serial. Enter bootloader mode with a double-tap on reset.
+- **Key provisioning:** Connect via USB; Whimbrel injects the shared AES-128 key. Physical presence is required. The firmware has no serial commands to read the key back.
+
+---
 
 ## Safety & Notes
 
-- **Safety**: This is a prototype security device. Use at your own risk. Do not test lock behavior while riding.
-- **Legal**: Not affiliated with Segway-Ninebot.
-- **Repo**: Please avoid committing KiCad per-user state (`*.kicad_prl`) or lock files.
+- Prototype security device. Use at your own risk.
+- Do not test lock behavior while riding.
+- Not affiliated with Segway-Ninebot.
+- Avoid committing KiCad per-user state (`*.kicad_prl`) or lock files.
