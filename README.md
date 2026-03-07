@@ -12,7 +12,7 @@ ImmoCommon handles:
 
 - **Cryptography (`immo_crypto`)**: Building nonces, message payloads, and generating AES-128-CCM Message Integrity Codes (MIC). Also provides constant-time equality checks to prevent timing attacks.
 - **Provisioning (`immo_provisioning`)**: VBUS detection, USB serial reading, hex parsing, CRC-16-CCITT checksum validation, and the standard `PROV:` serial loop used by the Whimbrel web app.
-- **Storage (`immo_storage`)**: `CounterStore` implementation using `Adafruit_LittleFS`. Handles atomic writes, CRC-32 integrity checks, and log rotation for the anti-replay counter.
+- **Storage (`immo_storage`)**: `CounterStore` implementation using `Adafruit_LittleFS`. Handles atomic writes, CRC-32 integrity checks, and log rotation for the anti-replay counter. At 10 unlocks/day, standard NVS ~2.7 years; wear-leveling extends this.
 
 ## Usage
 
