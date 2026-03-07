@@ -1,8 +1,8 @@
 #pragma once
 
-// BLE Manufacturer Specific Data "company id" (2 bytes, little-endian).
-// 0xFFFF is a common placeholder for prototypes.
-#define UGUISU_COMPANY_ID 0xFFFF
+// BLE Manufacturer Specific Data company ID (2 bytes, little-endian).
+// Must match Guillemot. 0xFFFF is a common placeholder for prototypes.
+static constexpr uint16_t MSD_COMPANY_ID = 0xFFFF;
 
 // Button pin used to trigger a one-shot advertisement burst.
 // Pick a real GPIO used in your Uguisu hardware.
