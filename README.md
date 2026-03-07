@@ -21,7 +21,7 @@ Mount Guillemot on the plastic underside of the deck for good 2.4 GHz RF.
 | Q1        | IPB042N10N3G    | Main MOSFET: 100 V/137 A, D2PAK, low-side GND return              | C69300 (ext.)    | $3.59 |
 | Q2        | AO3422          | Pre-charge FET, inrush ~0.8 A. Driven by latch Q.                 | C37130 (ext.)    | $0.75 |
 | Q3        | SI2309CDS       | Bleeder P-FET: disconnects 10 kΩ bleeder when locked (0 μA)       | C10493 (ext.)    | $0.23 |
-| Q4        | 2N7002          | Gate drive                                                        | C8545 (ext.)     | $0.23 |
+| Q4        | 2N7002          | Gate drive                                                        | C8545            | $0.23 |
 | Q5, Q6    | MMBT3904        | Buzzer driver                                                     | C20526           | $0.01 |
 | BZ1       | FUET-1230       | Buzzer: 12×12×3 mm SMD, 4 kHz. Driven by MMBT3904                 | C391037 (ext.)   | $0.22 |
 | D1        | BZT52C12-7-F    | 12 V Zener                                                        | C124196          | $0.01 |
