@@ -1,5 +1,8 @@
 .DS_Store
 
+# KiCad production outputs
+production/
+
 # KiCad per-user / cache artifacts
 *.kicad_prl
 fp-info-cache
