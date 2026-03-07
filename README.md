@@ -9,16 +9,16 @@ Uguisu is the BLE key fob in a three-part immobilizer system ([Guillemot](https:
 ### Components & BOM (~$10)
 
 
-| Ref  | Part                    | Notes                           | Source       | Cost   |
-| ---- | ----------------------- | ------------------------------- | ------------ | ------ |
-| U1   | XIAO nRF52840           | Castellated, 21×17.5 mm         | Seeed/Amazon | $6.00  |
-| BAT  | 100 mAh 3.7 V LiPo      | Solder pads on XIAO bottom      | Generic      | $2.00  |
-| SW1  | ALPS SKQGABE010         | PCB-mounted, SMD tact           | C115351      | $0.10  |
-| LED1 | TC5050RGBF08-3CJH-AF53A | RGB LED, 5050 SMD, common-anode | C784540      | $0.15  |
-| R1   | 120 Ω                   | LED B (D1), 0603 SMD            | JLCPCB Basic | —      |
-| R2   | 330 Ω                   | LED R (D2), 0603 SMD            | JLCPCB Basic | —      |
-| R3   | 150 Ω                   | LED G (D3), 0603 SMD            | JLCPCB Basic | —      |
-| —    | Enclosure               | ~35×25×12 mm, 3D-printed        | Local        | ~$1.00 |
+| Ref  | Part                    | Notes                           | Source       | Cost  |
+| ---- | ----------------------- | ------------------------------- | ------------ | ----- |
+| U1   | XIAO nRF52840           | Castellated, 21×17.5 mm         | Seeed/Amazon | $6.00 |
+| BAT  | 100 mAh 3.7 V LiPo      | Solder pads on XIAO bottom      | Generic      | $2.00 |
+| SW1  | ALPS SKQGABE010         | PCB-mounted, SMD tact           | C115351      | $0.10 |
+| LED1 | TC5050RGBF08-3CJH-AF53A | RGB LED, 5050 SMD, common-anode | C784540      | $0.15 |
+| R1   | 120 Ω                   | LED B (D1), 0603 SMD            | JLCPCB Basic | —     |
+| R2   | 330 Ω                   | LED R (D2), 0603 SMD            | JLCPCB Basic | —     |
+| R3   | 150 Ω                   | LED G (D3), 0603 SMD            | JLCPCB Basic | —     |
+| —    | Enclosure               | ~50×35×12 mm, 3D-printed        | Homemade     | —     |
 
 
 Hand-solder XIAO and LiPo.
@@ -33,9 +33,9 @@ KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
 | Function     | Pin | nRF P0.x | Notes                                              |
 | ------------ | --- | -------- | -------------------------------------------------- |
 | Button (SW1) | D0  | P0.02    | Active-low, internal pull-up, wake-from-system-off |
-| LED B (LED1) | D1  | P0.03    | LED1 pin 4, R1 120 Ω, active-low (sink)             |
-| LED R (LED1) | D2  | P0.28    | LED1 pin 5, R2 330 Ω, active-low (sink)             |
-| LED G (LED1) | D3  | P0.29    | LED1 pin 6, R3 150 Ω, active-low (sink)             |
+| LED B (LED1) | D1  | P0.03    | LED1 pin 4, R1 120 Ω, active-low (sink)            |
+| LED R (LED1) | D2  | P0.28    | LED1 pin 5, R2 330 Ω, active-low (sink)            |
+| LED G (LED1) | D3  | P0.29    | LED1 pin 6, R3 150 Ω, active-low (sink)            |
 
 
 ### Operation

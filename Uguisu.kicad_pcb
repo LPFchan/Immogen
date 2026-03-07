@@ -1867,8 +1867,8 @@
 		)
 	)
 	(gr_line
-		(start 103.5 60.75)
-		(end 134.5 60.75)
+		(start 103.525 60.75)
+		(end 134.525 60.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1877,8 +1877,8 @@
 		(uuid "03a6f4a0-e232-43cf-9871-f280215ddb6a")
 	)
 	(gr_line
-		(start 136.5 62.75)
-		(end 136.5 108.75)
+		(start 136.525 62.75)
+		(end 136.525 108.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1887,8 +1887,8 @@
 		(uuid "0e0c4186-247a-4a95-9557-d4da5c9e1a60")
 	)
 	(gr_circle
-		(center 105.25 106.99985)
-		(end 106.38 108.64985)
+		(center 105.275 106.99985)
+		(end 106.405 108.64985)
 		(stroke
 			(width 0.2)
 			(type solid)
@@ -1898,9 +1898,9 @@
 		(uuid "164540d5-2132-452c-b76d-c9f83b9ae602")
 	)
 	(gr_arc
-		(start 103.5 110.75)
-		(mid 102.085786 110.164214)
-		(end 101.5 108.75)
+		(start 103.525 110.75)
+		(mid 102.110786 110.164214)
+		(end 101.525 108.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1909,9 +1909,9 @@
 		(uuid "3bbb1ff1-e6c4-4e93-a178-a047ea7bff85")
 	)
 	(gr_arc
-		(start 134.5 60.75)
-		(mid 135.914214 61.335786)
-		(end 136.5 62.75)
+		(start 134.525 60.75)
+		(mid 135.939214 61.335786)
+		(end 136.525 62.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1920,8 +1920,8 @@
 		(uuid "720165cc-0038-4ea0-872d-270220d3999c")
 	)
 	(gr_line
-		(start 101.5 108.75)
-		(end 101.5 62.75)
+		(start 101.525 108.75)
+		(end 101.525 62.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1930,8 +1930,8 @@
 		(uuid "900b6832-f04f-4431-9b4f-4c0188d9f200")
 	)
 	(gr_line
-		(start 134.5 110.75)
-		(end 103.5 110.75)
+		(start 134.525 110.75)
+		(end 103.525 110.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1940,9 +1940,9 @@
 		(uuid "a41d6e9b-a0c0-4e3a-9975-204d2ec1bda8")
 	)
 	(gr_arc
-		(start 101.5 62.75)
-		(mid 102.085786 61.335786)
-		(end 103.5 60.75)
+		(start 101.525 62.75)
+		(mid 102.110786 61.335786)
+		(end 103.525 60.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1951,8 +1951,8 @@
 		(uuid "c90ce5d1-fad2-4466-b679-dd963b483271")
 	)
 	(gr_circle
-		(center 105.25 64.49955)
-		(end 106.38 66.14955)
+		(center 105.275 64.49955)
+		(end 106.405 66.14955)
 		(stroke
 			(width 0.2)
 			(type solid)
@@ -1962,9 +1962,9 @@
 		(uuid "ce81ae21-3f9d-4911-8ead-4fb3e913b34f")
 	)
 	(gr_arc
-		(start 136.5 108.75)
-		(mid 135.914214 110.164214)
-		(end 134.5 110.75)
+		(start 136.525 108.75)
+		(mid 135.939214 110.164214)
+		(end 134.525 110.75)
 		(stroke
 			(width 0.2)
 			(type default)
@@ -1973,8 +1973,8 @@
 		(uuid "dd632d8c-083c-4ea0-b379-8ef17b0b417b")
 	)
 	(gr_circle
-		(center 132.75 107.00015)
-		(end 133.88 108.65015)
+		(center 132.775 107.00015)
+		(end 133.905 108.65015)
 		(stroke
 			(width 0.2)
 			(type solid)
@@ -1984,8 +1984,8 @@
 		(uuid "f0fce747-e56b-4576-b2a0-a01746a89416")
 	)
 	(gr_circle
-		(center 132.75 64.49985)
-		(end 133.88 66.14985)
+		(center 132.775 64.49985)
+		(end 133.905 66.14985)
 		(stroke
 			(width 0.2)
 			(type solid)
@@ -2017,14 +2017,6 @@
 		(layers "F.Cu" "B.Cu")
 		(net 1)
 		(uuid "8394533e-bbad-448d-8266-269bf475c734")
-	)
-	(segment
-		(start 115.9 63.15)
-		(end 115.9 63.175)
-		(width 0.2)
-		(layer "B.Cu")
-		(net 1)
-		(uuid "5fc62905-17c6-4ce2-acd2-f34712390c76")
 	)
 	(segment
 		(start 128.675 66.3)
@@ -2163,12 +2155,12 @@
 		(uuid "cf98ecb6-efc0-4eec-92be-9fb3f4bbb660")
 	)
 	(segment
-		(start 117.04 74.5)
-		(end 117.04 73.6615)
+		(start 117.04 77.5)
+		(end 117 77.5)
 		(width 0.5)
 		(layer "B.Cu")
 		(net 12)
-		(uuid "2bc8c56d-c219-469d-be50-1f57f15fa437")
+		(uuid "036f9791-634d-485a-98b9-c13dd371a15d")
 	)
 	(segment
 		(start 117.04 76)
@@ -2177,6 +2169,14 @@
 		(layer "B.Cu")
 		(net 12)
 		(uuid "346fe51d-33d6-48a5-a684-5b448c12f536")
+	)
+	(segment
+		(start 117 77.5)
+		(end 114.5 80)
+		(width 0.5)
+		(layer "B.Cu")
+		(net 12)
+		(uuid "3a77e60a-9045-4e49-8a86-db5f483a547b")
 	)
 	(segment
 		(start 117.04 74.5)
@@ -2195,20 +2195,20 @@
 		(uuid "4f8acd61-2dda-4835-b32b-2d400f7a7870")
 	)
 	(segment
+		(start 114.5 80)
+		(end 105.5 80)
+		(width 0.5)
+		(layer "B.Cu")
+		(net 12)
+		(uuid "62f0761d-dcee-4d48-8b62-7471d181e404")
+	)
+	(segment
 		(start 105.5115 80)
 		(end 114.445 71.0665)
 		(width 0.5)
 		(layer "B.Cu")
 		(net 12)
 		(uuid "6e5af1e4-544b-4f94-b5d7-97fbe916353a")
-	)
-	(segment
-		(start 117.04 73.6615)
-		(end 114.445 71.0665)
-		(width 0.5)
-		(layer "B.Cu")
-		(net 12)
-		(uuid "7f3965b9-6b22-4ca4-9e2b-416426496efe")
 	)
 	(segment
 		(start 108.375 65.875)
