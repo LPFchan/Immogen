@@ -27,6 +27,17 @@ Hand-solder XIAO and LiPo.
 
 KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
 
+### GPIO
+
+
+| Function     | Pin | nRF P0.x | Notes                                              |
+| ------------ | --- | -------- | -------------------------------------------------- |
+| Button (SW1) | D0  | P0.02    | Active-low, internal pull-up, wake-from-system-off |
+| LED B (LED1) | D1  | P0.03    | LED1 pin 4, R1 120 Ω, active-low (sink)             |
+| LED R (LED1) | D2  | P0.28    | LED1 pin 5, R2 330 Ω, active-low (sink)             |
+| LED G (LED1) | D3  | P0.29    | LED1 pin 6, R3 150 Ω, active-low (sink)             |
+
+
 ### Operation
 
 - **Unlock flow:** Button press → GPIO wake → boot → init BLE → read/increment NVS → AES-128-CCM → broadcast ~2 s →`sd_power_system_off()`.
@@ -35,8 +46,6 @@ KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
 
 ### Design Notes
 
-- **Button:** D0 (P0.02), active-low with internal pull-up. Used for wake-from-system-off.
-- **RGB LED (LED1):** TC5050 common-anode. B=D1/120 Ω, R=D2/330 Ω, G=D3/150 Ω. Active-low.
 - **NVS wear:** Counter written every press (System OFF kills RAM). At 10 unlocks/day, ~2.7 years; wear-leveling extends this.
 
 ---

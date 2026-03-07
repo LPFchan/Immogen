@@ -1732,7 +1732,7 @@
 		)
 		(uuid "40a423ab-7031-4d06-bed3-e5cb1006ec0a")
 	)
-	(label "MCU_D1"
+	(label "MCU_D3"
 		(at 162.56 86.36 0)
 		(effects
 			(font
@@ -1762,7 +1762,7 @@
 		)
 		(uuid "aa40c1ba-b441-4e9e-bf04-6767996b1ae5")
 	)
-	(label "MCU_D3"
+	(label "MCU_D1"
 		(at 162.56 96.52 0)
 		(effects
 			(font
@@ -2133,7 +2133,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "71720cde-4dfc-4759-a05f-df56a7135ba5")
-		(property "Reference" "LED2"
+		(property "Reference" "LED1"
 			(at 150.62 77.47 0)
 			(effects
 				(font
@@ -2206,7 +2206,7 @@
 		(instances
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
-					(reference "LED2")
+					(reference "LED1")
 					(unit 1)
 				)
 			)
@@ -2221,7 +2221,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "8ecc3862-35c6-420e-8c0b-e0505465db32")
-		(property "Reference" "R3"
+		(property "Reference" "R1"
 			(at 158.75 94.488 90)
 			(effects
 				(font
@@ -2273,7 +2273,7 @@
 		(instances
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
-					(reference "R3")
+					(reference "R1")
 					(unit 1)
 				)
 			)
@@ -2288,7 +2288,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "8fa25505-659c-4419-b8bf-9f5b9902097a")
-		(property "Reference" "R1"
+		(property "Reference" "R2"
 			(at 158.75 89.408 90)
 			(effects
 				(font
@@ -2340,7 +2340,7 @@
 		(instances
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
-					(reference "R1")
+					(reference "R2")
 					(unit 1)
 				)
 			)
@@ -2766,7 +2766,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "eb25b5f1-b5b2-4d7d-94f2-0d3bd54f168d")
-		(property "Reference" "R2"
+		(property "Reference" "R3"
 			(at 158.75 84.328 90)
 			(effects
 				(font
@@ -2818,7 +2818,7 @@
 		(instances
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
-					(reference "R2")
+					(reference "R3")
 					(unit 1)
 				)
 			)
