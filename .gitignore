@@ -14,3 +14,6 @@ fp-info-cache
 # Firmware secrets (never commit)
 **/guillemot_secrets_local.h
 
+# Production artifacts
+production/
+
