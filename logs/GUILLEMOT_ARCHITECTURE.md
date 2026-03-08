@@ -36,7 +36,7 @@ The main firmware application focuses on setup, BLE scanning, and hardware inter
 *   **BLE Scanning (`scan_callback`):**
     *   Triggers every time a BLE advertisement is captured.
     *   Calls `parse_payload_from_report()` to extract Manufacturer Specific Data matching the `MSD_COMPANY_ID` (0xFFFF by default).
-    *   The payload (9 bytes) consists of a 4-byte monotonic counter, a 1-byte command (Lock `0x02` or Unlock `0x01`), and a 4-byte AES-CCM MIC.
+    *   The payload (13 bytes) consists of a 4-byte monotonic counter, a 1-byte command (Lock `0x02` or Unlock `0x01`), and an 8-byte AES-CCM MIC.
 *   **Validation & Execution:**
     *   `verify_payload()`: Reconstructs the expected message and nonce, calculating the AES-CCM MIC. If the calculated MIC matches the received MIC in constant time, the payload is authentic.
     *   `handle_valid_command()`: Rejects payloads with a counter less than or equal to the last stored counter (anti-replay). If valid, it pulses the latch (`latch_set_pulse` or `latch_reset_pulse`), sounds the buzzer, and records the new counter to flash.
@@ -56,7 +56,7 @@ Stored in `lib/ImmoCommon`, this submodule is shared between the Guillemot recei
 ### Cryptography (`immo_crypto.cpp` / `.h`)
 Implements AES-128 CCM (Counter with CBC-MAC) for payload authentication without requiring heavy cryptographic libraries.
 *   `build_nonce()` & `build_msg()`: Structures the data correctly for AES-CCM.
-*   `ccm_mic_4()`: Calculates a 4-byte Message Integrity Code (MIC) over the payload using hardware ECB encryption (`sd_ecb_block_encrypt`) provided by the Nordic SoftDevice.
+*   `ccm_mic_8()`: Calculates an 8-byte Message Integrity Code (MIC) over the payload using hardware ECB encryption (`sd_ecb_block_encrypt`) provided by the Nordic SoftDevice.
 *   `constant_time_eq()`: Compares the received MIC with the expected MIC using bitwise XOR to prevent timing side-channel attacks.
 
 ### Flash Storage (`immo_storage.cpp` / `.h`)

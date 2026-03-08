@@ -79,7 +79,7 @@ Scanning is duty-cycled (20 ms every 2 seconds) to conserve power. The receiver 
 ### Protocol
 
 - Advertisement-based BLE (no persistent connection).
-- Payload: 4-byte monotonic counter, 1-byte command (0x01 = unlock, 0x02 = lock), 4-byte AES-CCM MIC.
+- Payload: 4-byte monotonic counter, 1-byte command (0x01 = unlock, 0x02 = lock), 8-byte AES-CCM MIC.
 - Validation and crypto via [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
 - Full protocol spec: [ImmoCommon README § BLE Protocol](https://github.com/LPFchan/ImmoCommon#ble-protocol).
 

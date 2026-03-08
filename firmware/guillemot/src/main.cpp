@@ -123,7 +123,7 @@ bool verify_payload(const immo::Payload& pl) {
   immo::build_msg(pl.counter, pl.command, msg);
 
   uint8_t expected[immo::MIC_LEN];
-  if (!immo::ccm_mic_4(g_psk, nonce, msg, sizeof(msg), expected)) return false;
+  if (!immo::ccm_mic_8(g_psk, nonce, msg, sizeof(msg), expected)) return false;
   return immo::constant_time_eq(expected, pl.mic, immo::MIC_LEN);
 }
 
