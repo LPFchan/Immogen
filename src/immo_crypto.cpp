@@ -47,7 +47,7 @@ void build_msg(uint32_t counter, Command command, uint8_t msg[MSG_LEN]) {
   msg[4] = static_cast<uint8_t>(command);
 }
 
-bool ccm_mic_4(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], const uint8_t* msg, size_t msg_len, uint8_t out_mic[MIC_LEN]) {
+bool ccm_mic_8(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], const uint8_t* msg, size_t msg_len, uint8_t out_mic[MIC_LEN]) {
   if (msg_len > 0xFFFFu) return false;
 
   const uint8_t L = 2;

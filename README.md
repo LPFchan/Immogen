@@ -35,26 +35,26 @@ This section defines the encrypted BLE advertisement format and cryptography use
 - **128-bit (16 bytes)** AES key. Must be **identical** on Uguisu and Guillemot.
 - **Provisioning:** Use [Whimbrel](https://github.com/LPFchan/Whimbrel) over Web Serial to write the same key to both devices. Never commit real keys.
 
-### Advertising payload (9 bytes)
+### Advertising payload (13 bytes)
 
-After the 2-byte company ID, the MSD payload is 9 bytes:
+After the 2-byte company ID, the MSD payload is 13 bytes:
 
 
 | Offset | Size | Field   | Endianness | Purpose                    |
 | ------ | ---- | ------- | ---------- | -------------------------- |
 | 0      | 4    | counter | little     | Anti-replay, monotonic     |
 | 4      | 1    | command | —          | 0x01 = Unlock, 0x02 = Lock |
-| 5      | 4    | mic     | —          | AES-128-CCM auth tag       |
+| 5      | 8    | mic     | —          | AES-128-CCM auth tag       |
 
 
-Full MSD = `company_id_le(2) || counter_le(4) || command(1) || mic(4)` → 11 bytes total.
+Full MSD = `company_id_le(2) || counter_le(4) || command(1) || mic(8)` → 15 bytes total.
 
-### AES-128-CCM MIC (4-byte tag)
+### AES-128-CCM MIC (8-byte tag)
 
 - **Nonce (13 bytes):** `counter_le(4) || 0x00×9`.
 - **Message (5 bytes):** `counter_le(4) || command(1)`.
-- **Tag length:** 4 bytes (M=4, L=2 in CCM flags).
-- MIC is computed over the 5-byte message with the 13-byte nonce and the 16-byte PSK; result is the 4-byte tag appended in the payload.
+- **Tag length:** 8 bytes (M=8, L=2 in CCM flags).
+- MIC is computed over the 5-byte message with the 13-byte nonce and the 16-byte PSK; result is the 8-byte tag appended in the payload.
 
 Receiver verifies: recomputes MIC over (counter, command) and compares to received MIC in constant time. Fob computes the same MIC when building the advert.
 
@@ -72,7 +72,7 @@ From Uguisu or Guillemot (ImmoCommon as submodule in `lib/ImmoCommon`):
 python3 lib/ImmoCommon/tools/test_vectors/gen_mic.py --company-id <YOUR_ID> --counter 0 --command 1 --key <32 hex chars>
 ```
 
-Output includes `msd_company_plus_payload` (11 bytes) you can inject or compare against firmware.
+Output includes `msd_company_plus_payload` (15 bytes) you can inject or compare against firmware.
 
 ## Usage
 

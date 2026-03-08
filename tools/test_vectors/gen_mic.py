@@ -54,17 +54,17 @@ def main() -> None:
     nonce = le32(counter) + (b"\x00" * 9)  # 13 bytes
     msg = le32(counter) + bytes([command])  # 5 bytes
 
-    aesccm = AESCCM(parse_key(args.key), tag_length=4)
+    aesccm = AESCCM(parse_key(args.key), tag_length=8)
     ct_and_tag = aesccm.encrypt(nonce, msg, None)
-    tag = ct_and_tag[-4:]
+    tag = ct_and_tag[-8:]
 
-    payload = msg + tag  # 9 bytes
+    payload = msg + tag  # 13 bytes
     msd = le16(company_id) + payload
 
     print("nonce:", nonce.hex())
     print("msg:", msg.hex())
     print("mic:", tag.hex())
-    print("payload_9B:", payload.hex())
+    print("payload_13B:", payload.hex())
     print("msd_company_plus_payload:", msd.hex())
 
 
