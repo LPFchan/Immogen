@@ -86,11 +86,11 @@ static void load_provisioning() {
   }
 }
 
-void start_advertising_once(uint16_t company_id, const uint8_t payload9[immo::PAYLOAD_LEN]) {
+void start_advertising_once(uint16_t company_id, const uint8_t payload13[immo::PAYLOAD_LEN]) {
   uint8_t msd[2 + immo::PAYLOAD_LEN];
   msd[0] = static_cast<uint8_t>(company_id & 0xFF);
   msd[1] = static_cast<uint8_t>((company_id >> 8) & 0xFF);
-  memcpy(&msd[2], payload9, immo::PAYLOAD_LEN);
+  memcpy(&msd[2], payload13, immo::PAYLOAD_LEN);
 
   Bluefruit.Advertising.stop();
   Bluefruit.Advertising.clearData();
@@ -181,14 +181,14 @@ void setup() {
   immo::build_msg(counter, command, msg);
 
   uint8_t mic[immo::MIC_LEN];
-  const bool ok = immo::ccm_mic_4(g_psk, nonce, msg, sizeof(msg), mic);
+  const bool ok = immo::ccm_mic_8(g_psk, nonce, msg, sizeof(msg), mic);
   if (!ok) system_off();
 
-  uint8_t payload9[immo::PAYLOAD_LEN];
-  memcpy(&payload9[0], msg, sizeof(msg));
-  memcpy(&payload9[sizeof(msg)], mic, sizeof(mic));
+  uint8_t payload13[immo::PAYLOAD_LEN];
+  memcpy(&payload13[0], msg, sizeof(msg));
+  memcpy(&payload13[sizeof(msg)], mic, sizeof(mic));
 
-  start_advertising_once(MSD_COMPANY_ID, payload9);
+  start_advertising_once(MSD_COMPANY_ID, payload13);
   delay(UGUISU_ADVERTISE_MS);
   g_store.update(counter);
   system_off();

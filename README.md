@@ -60,7 +60,7 @@ Boot routine checks `NRF_POWER->USBREGSTATUS` (`VBUSDETECT`). If USB connected: 
 ### Protocol
 
 - Advertisement-based BLE (no persistent connection).
-- Payload: 4-byte monotonic counter, 1-byte command (0x01 = unlock, 0x02 = lock), 4-byte AES-CCM MIC.
+- Payload: 4-byte monotonic counter, 1-byte command (0x01 = unlock, 0x02 = lock), 8-byte AES-CCM MIC.
 - Generation and crypto via [ImmoCommon](https://github.com/LPFchan/ImmoCommon).
 - Full protocol spec: [ImmoCommon README § BLE Protocol](https://github.com/LPFchan/ImmoCommon#ble-protocol).
 
