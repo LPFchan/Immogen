@@ -217,6 +217,23 @@
 
     .power-stat .stat-label { font-size: 9px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
     .power-stat .stat-val   { font-size: 17px; font-weight: bold; }
+
+    /* Link toggle switch */
+    .toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-knob {
+      position: absolute; inset: 0;
+      background: #21262d; border-radius: 20px; cursor: pointer;
+      border: 1px solid #30363d; transition: background 0.2s, border-color 0.2s;
+    }
+    .toggle-knob:before {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; left: 2px; top: 2px;
+      background: #8b949e; border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-knob { background: #1f6feb; border-color: #388bfd; }
+    .toggle-switch input:checked + .toggle-knob:before { transform: translateX(16px); background: #fff; }
   </style>
 </head>
 <body>
@@ -233,8 +250,8 @@
     </div>
     <div class="row">
       <label>Scan Window</label>
-      <input type="range" id="scanWindow" min="10" max="200" step="5" value="20">
-      <span class="val" id="scanWindowVal">20 ms</span>
+      <input type="range" id="scanWindow" min="10" max="200" step="5" value="25">
+      <span class="val" id="scanWindowVal">25 ms</span>
     </div>
   </div>
 
@@ -251,6 +268,19 @@
       <span class="val" id="advIntervalVal">20 ms</span>
     </div>
   </div>
+</div>
+
+<div class="controls-bar" style="margin-bottom:10px; padding:8px 14px;">
+  <label class="toggle-switch">
+    <input type="checkbox" id="linkToggle">
+    <span class="toggle-knob"></span>
+  </label>
+  <span style="font-size:11px; color:#8b949e;">
+    Link
+    <span style="color:#58a6ff;">scan interval</span> ↔ <span style="color:#3fb950;">adv duration</span>
+    &nbsp;&amp;&nbsp;
+    <span style="color:#58a6ff;">scan window</span> ↔ <span style="color:#3fb950;">packet interval</span>
+  </span>
 </div>
 
 <div class="controls-bar">
@@ -335,7 +365,7 @@
     </div>
     <div style="font-size:9px; color:#484f58; line-height:1.5;">
       Measured from scooter's 36 V battery. Scales linearly with scan duty cycle.
-      Baseline: 22 μA at 1% duty (2000/20 ms).
+      ~65 μA at 1% duty; ~306 μA at current 5% duty (25/500 ms). See logs/15.
     </div>
   </div>
 
@@ -531,13 +561,14 @@
     document.getElementById('pressesPerDayVal').textContent = pressesPerDay;
 
     // ── Guillemot ──
-    // README: ~22 μA (locked) from scooter's 36 V battery at 1% duty (2000/20 ms).
+    // Power model: static overhead + radio component scaled by duty cycle.
     // Breakdown: ~5 μA static (TPSM365R6V3 buck Iq ~4 μA + SR latch ~1 μA) +
-    //            ~17 μA scan component at 1% duty.
-    // Only the scan component scales with duty cycle; static is always on.
+    //            ~60 μA scan component at 1% duty (nRF52840 RX ~6 mA × 0.01).
+    // At current firmware 5% duty (25/500): 5 + 60×5 = 305 μA.
+    // See logs/15-BLE_POWER_ANALYSIS_AND_DOCUMENTATION_DISCREPANCY.md.
     const duty_frac      = p.scanWindow / p.scanInterval;
     const G_STATIC_uA    = 5;                             // buck Iq + latch (constant)
-    const G_SCAN_1PCT_uA = 17;                            // scan at 1% duty (22 - 5)
+    const G_SCAN_1PCT_uA = 60;                            // scan at 1% duty (nRF52840 RX ~6 mA × 0.01)
     const gCurrent_uA    = G_STATIC_uA + G_SCAN_1PCT_uA * (duty_frac / 0.01);
     const G30_mAh        = 15300;                         // 15.3 Ah = 15300 mAh
     const gLife_hours    = G30_mAh / (gCurrent_uA / 1000);
@@ -747,6 +778,29 @@
     ctx.fillText(msg, W / 2 - tw / 2, 14);
   }
 
+  // ── Linked-slider helpers ─────────────────────────────────────────────────
+
+  function isLinked() {
+    return document.getElementById('linkToggle').checked;
+  }
+
+  function syncLinkedSliders(changedId) {
+    if (!isLinked()) return;
+    const pairs = {
+      scanInterval: 'advDuration',
+      advDuration:  'scanInterval',
+      scanWindow:   'advInterval',
+      advInterval:  'scanWindow',
+    };
+    const partnerId = pairs[changedId];
+    if (!partnerId) return;
+    const val     = +document.getElementById(changedId).value;
+    const partner = document.getElementById(partnerId);
+    const step    = +partner.step;
+    const clamped = Math.round(Math.max(+partner.min, Math.min(+partner.max, val)) / step) * step;
+    partner.value = clamped;
+  }
+
   // ── Button press ──────────────────────────────────────────────────────────
 
   function pressButton() {
@@ -756,6 +810,11 @@
     const phase = Math.random() * p.scanInterval;
     const sim   = buildSim(p, phase);
     currentSim  = sim;
+
+    // Sync phase slider to the random phase used
+    const phaseIdx = Math.min(499, Math.round((phase / p.scanInterval) * 500));
+    document.getElementById('phaseSlider').value = phaseIdx;
+    document.getElementById('phaseSliderVal').textContent = 'phase ' + phaseIdx;
 
     const el = document.getElementById('statResult');
     el.textContent = sim.firstHit !== null ? 'HIT ✓' : 'MISS ✗';
@@ -787,9 +846,20 @@
   ['scanInterval', 'scanWindow', 'advDuration', 'advInterval', 'simSpeed'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
       if (animId) { cancelAnimationFrame(animId); animId = null; }
+      syncLinkedSliders(id);
       updateLabels();
       draw(getParams(), currentSim, null);
     });
+  });
+
+  document.getElementById('linkToggle').addEventListener('change', () => {
+    if (isLinked()) {
+      // On enable: drive Guillemot → Uguisu
+      syncLinkedSliders('scanInterval');
+      syncLinkedSliders('scanWindow');
+      updateLabels();
+      draw(getParams(), currentSim, null);
+    }
   });
 
   document.getElementById('pressBtn').addEventListener('click', pressButton);
