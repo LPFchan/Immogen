@@ -21,8 +21,8 @@ Guillemot sits inline between the battery and ESC via an XT60 splice. Without a 
 
 | Path             | Description                                                                                                                                                                       |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Uguisu/`    | Key fob — firmware, KiCad, BOM. Button press → 2 s BLE broadcast → sleep. [README](https://github.com/LPFchan/Immogen/tree/main/Uguisu#readme)                                 |
-| `Guillemot/` | Deck receiver — firmware, KiCad, BOM. Duty-cycled scan (5%), validates adverts → SR latch → power gate. [README](https://github.com/LPFchan/Immogen/tree/main/Guillemot#readme) |
+| `Uguisu/`    | Key fob — firmware, KiCad, BOM. Button press → 2 s BLE broadcast → sleep. [README](https://github.com/LPFchan/Immogen/tree/main/Uguisu#readme)                                 |
+| `Guillemot/` | Deck receiver — firmware, KiCad, BOM. Duty-cycled scan (5%), validates adverts → SR latch → power gate. [README](https://github.com/LPFchan/Immogen/tree/main/Guillemot#readme) |
 | `lib/`       | Shared C++ library: AES-128-CCM MIC, provisioning loop, LittleFS counter storage                                                                                                  |
 | `tools/`     | LED visualizer, BLE timing simulator, buzzer tuner (HTML); MIC test vectors (`gen_mic.py`)                                                                                        |
 | `logs/`      | Migration reports and guides                                                                                                                                                      |
