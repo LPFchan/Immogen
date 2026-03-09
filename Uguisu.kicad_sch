@@ -1641,10 +1641,6 @@
 		(uuid "a1b0007b-da63-42ad-9b2d-01d1de1e2bb2")
 	)
 	(no_connect
-		(at 85.09 63.5)
-		(uuid "a77b7f2c-93ec-47c2-a057-b18126d9854e")
-	)
-	(no_connect
 		(at 85.09 71.12)
 		(uuid "cbea84c1-9372-46e3-bdd9-c61d7c8c5977")
 	)
@@ -1732,6 +1728,16 @@
 		)
 		(uuid "40a423ab-7031-4d06-bed3-e5cb1006ec0a")
 	)
+	(label "3.3V"
+		(at 85.09 63.5 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "50aa0e98-c17d-4f06-9e6c-a53d70e588e1")
+	)
 	(label "MCU_D3"
 		(at 163.83 111.76 0)
 		(effects
@@ -1761,6 +1767,16 @@
 			(justify right bottom)
 		)
 		(uuid "aa40c1ba-b441-4e9e-bf04-6767996b1ae5")
+	)
+	(label "3.3V"
+		(at 119.38 83.82 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "b25f216a-dd5a-4a28-be0c-2a351a8fca6c")
 	)
 	(label "MCU_D1"
 		(at 163.83 121.92 0)
@@ -1925,6 +1941,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 128.27 83.82 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3043f930-f909-49b5-bbd4-d824514ee633")
+		(property "Reference" "#PWR09"
+			(at 128.27 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 128.27 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 128.27 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 128.27 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 128.27 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "8da2135a-9c1b-4a35-8aca-8ad288addfd6")
+		)
+		(instances
+			(project ""
+				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
+					(reference "#PWR09")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+BATT")
 		(at 143.51 116.84 90)
 		(unit 1)
@@ -2052,6 +2134,73 @@
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
 					(reference "#PWR05")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 128.27 83.82 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "52a3bc41-81ba-432a-9e8d-e9e9dd34ffb0")
+		(property "Reference" "GND1"
+			(at 130.81 79.2479 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "GND"
+			(at 130.81 81.7879 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_3.0x3.0mm"
+			(at 133.35 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 133.35 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "test point"
+			(at 128.27 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c4f0d312-590c-4237-b843-cf343a6d96a8")
+		)
+		(instances
+			(project ""
+				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
+					(reference "GND1")
 					(unit 1)
 				)
 			)
@@ -2208,6 +2357,73 @@
 			(project ""
 				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
 					(reference "LED1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 119.38 83.82 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6ba1cb06-cc41-4b84-bfd7-7a60368f0107")
+		(property "Reference" "3.3V1"
+			(at 121.92 79.2479 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "3.3V"
+			(at 121.92 81.7879 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_3.0x3.0mm"
+			(at 124.46 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 124.46 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "test point"
+			(at 119.38 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "f9f02924-def6-4493-baa1-46f41484b5ce")
+		)
+		(instances
+			(project ""
+				(path "/3411fae6-0f44-4a47-8bb3-5970407324d6"
+					(reference "3.3V1")
 					(unit 1)
 				)
 			)
