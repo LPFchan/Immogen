@@ -60,7 +60,10 @@ bool prov_run_serial_loop(uint32_t timeout_ms, bool (*on_success)(const uint8_t[
   char line[128];
   size_t len = 0;
 
-  while (millis() < deadline && len < sizeof(line) - 1) {
+  while (len < sizeof(line) - 1) {
+    // Enforce deadline only before data has started arriving; once PROV: is streaming, let it complete.
+    if (len == 0 && millis() >= deadline) return false;
+
     if (!Serial.available()) {
       delay(10);
       continue;
