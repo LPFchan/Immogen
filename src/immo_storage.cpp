@@ -40,7 +40,7 @@ void CounterStore::load() {
   CounterRecord rec{};
   while (f.read(reinterpret_cast<void*>(&rec), sizeof(rec)) == sizeof(rec)) {
     if (record_crc(rec.counter) != rec.crc32) continue;
-    last_counter_ = rec.counter;
+    if (rec.counter > last_counter_) last_counter_ = rec.counter;
   }
 }
 

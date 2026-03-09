@@ -9,11 +9,6 @@
 namespace immo {
 namespace {
 
-void le16_write(uint8_t out[2], uint16_t x) {
-  out[0] = static_cast<uint8_t>(x & 0xFF);
-  out[1] = static_cast<uint8_t>((x >> 8) & 0xFF);
-}
-
 void le32_write(uint8_t out[4], uint32_t x) {
   out[0] = static_cast<uint8_t>(x & 0xFF);
   out[1] = static_cast<uint8_t>((x >> 8) & 0xFF);

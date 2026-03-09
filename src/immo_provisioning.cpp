@@ -1,5 +1,8 @@
 #include "immo_provisioning.h"
+#include "immo_crypto.h"
 #include <Arduino.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
 
 namespace immo {
 namespace {
@@ -138,6 +141,51 @@ void ensure_provisioned(
     prov_run_serial_loop(timeout_ms, on_success);
     if (load_provisioning) load_provisioning();
   }
+}
+
+bool prov_write_and_verify(
+    const char* path,
+    const uint8_t key[16],
+    uint32_t counter,
+    CounterStore& store,
+    uint8_t* runtime_key
+) {
+  InternalFS.remove(path);
+  Adafruit_LittleFS_Namespace::File f(InternalFS.open(path, Adafruit_LittleFS_Namespace::FILE_O_WRITE));
+  if (!f) return false;
+
+  f.write(reinterpret_cast<const uint8_t*>(&PROV_MAGIC), 4);
+  f.write(key, 16);
+  f.flush();
+  f.close();
+
+  // Verify readback
+  Adafruit_LittleFS_Namespace::File fr(InternalFS.open(path, Adafruit_LittleFS_Namespace::FILE_O_READ));
+  if (!fr || fr.size() < 20) return false;
+
+  uint32_t read_magic = 0;
+  uint8_t read_key[16];
+  if (fr.read(reinterpret_cast<uint8_t*>(&read_magic), 4) != 4 ||
+      read_magic != PROV_MAGIC ||
+      fr.read(read_key, 16) != 16) {
+    return false;
+  }
+  if (!constant_time_eq(read_key, key, 16)) return false;
+
+  store.seed(counter);
+  memcpy(runtime_key, key, 16);
+  return true;
+}
+
+bool prov_load_key(const char* path, uint8_t out_key[16]) {
+  Adafruit_LittleFS_Namespace::File f(InternalFS.open(path, Adafruit_LittleFS_Namespace::FILE_O_READ));
+  if (!f || f.size() < 20) return false;
+
+  uint32_t magic = 0;
+  if (f.read(reinterpret_cast<uint8_t*>(&magic), 4) != 4) return false;
+  if (magic != PROV_MAGIC) return false;
+  if (f.read(out_key, 16) != 16) return false;
+  return true;
 }
 
 }  // namespace immo

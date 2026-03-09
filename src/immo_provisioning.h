@@ -1,8 +1,25 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include "immo_storage.h"
 
 namespace immo {
+
+// Magic prefix written before the PSK in flash. "PROV" in memory on LE ARM.
+static constexpr uint32_t PROV_MAGIC = 0x564F5250u;
+
+// Write key to flash with PROV_MAGIC prefix, verify readback, seed counter store,
+// and copy key to runtime buffer. Returns false if write or verification fails.
+bool prov_write_and_verify(
+    const char* path,
+    const uint8_t key[16],
+    uint32_t counter,
+    CounterStore& store,
+    uint8_t* runtime_key
+);
+
+// Load key from flash. Returns true if file has valid PROV_MAGIC + 16-byte key.
+bool prov_load_key(const char* path, uint8_t out_key[16]);
 
 // Returns true if VBUS is present.
 bool prov_is_vbus_present();
