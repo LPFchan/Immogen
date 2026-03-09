@@ -1,2 +1,14 @@
 .DS_Store
 **/.DS_Store
+
+# KiCad / EDA artifacts (**/hardware/)
+**/hardware/*.kicad_prl
+**/hardware/fp-info-cache
+**/hardware/_autosave-*.kicad_pcb
+**/hardware/~*.lck
+**/hardware/*-backups/
+**/hardware/production/
+
+# PlatformIO / VSCode
+**/.pio/
+**/.vscode/

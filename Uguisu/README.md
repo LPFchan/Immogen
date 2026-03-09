@@ -24,7 +24,7 @@ Hand-solder XIAO and LiPo.
 
 ### PCB Design
 
-KiCad (`Uguisu.kicad_sch` / `Uguisu.kicad_pcb`).
+KiCad (`hardware/Uguisu.kicad_sch` / `hardware/Uguisu.kicad_pcb`).
 
 ### GPIO
 
