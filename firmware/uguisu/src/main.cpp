@@ -34,6 +34,11 @@ static void load_provisioning() {
   immo::prov_load_key_or_zero(immo::DEFAULT_PROV_PATH, g_psk);
 }
 
+static TaskHandle_t g_prov_led_task = nullptr;
+static void prov_led_task(void*) {
+  while (true) { led::prov_pulse(); }
+}
+
 void start_advertising_once(uint16_t company_id, const uint8_t payload13[immo::PAYLOAD_LEN]) {
   uint8_t msd[2 + immo::PAYLOAD_LEN];
   msd[0] = static_cast<uint8_t>(company_id & 0xFF);
@@ -94,7 +99,15 @@ void setup() {
   }
 
   load_provisioning();
+  if (immo::prov_is_vbus_present()) {
+    xTaskCreate(prov_led_task, "prov_led", 128, nullptr, 1, &g_prov_led_task);
+  }
   immo::ensure_provisioned(immo::DEFAULT_PROV_TIMEOUT_MS, on_provision_success, load_provisioning, key_is_all_zeros);
+  if (g_prov_led_task) {
+    vTaskDelete(g_prov_led_task);
+    g_prov_led_task = nullptr;
+  }
+  led::off();
 
   Serial.println("BOOTED:Uguisu");
   Bluefruit.begin();
@@ -106,6 +119,8 @@ void setup() {
   if (press_ms == 0) system_off();  // No press within timeout, sleep
   const immo::Command command =
       (press_ms >= UGUISU_LONG_PRESS_MS) ? immo::Command::Lock : immo::Command::Unlock;
+  const uint8_t cmd_pin = (command == immo::Command::Lock) ? PIN_LED_R : PIN_LED_G;
+  const bool low_bat = (readVbat_mv() < LED_LOWBAT_MV_THRESHOLD);
 
   const uint32_t last = g_store.loadLast();
   const uint32_t counter = last + 1;
@@ -126,7 +141,18 @@ void setup() {
 
   g_store.update(counter);
   start_advertising_once(MSD_COMPANY_ID, payload13);
-  delay(UGUISU_ADVERTISE_MS);
+  const uint32_t adv_start = millis();
+
+  if (low_bat) {
+    led::flash_low_battery(cmd_pin);
+  } else {
+    led::flash_once(cmd_pin, LED_FLASH_RISE_MS, LED_FLASH_HOLD_MS, LED_FLASH_FALL_MS);
+  }
+
+  const uint32_t elapsed = millis() - adv_start;
+  if (elapsed < UGUISU_ADVERTISE_MS) {
+    delay(UGUISU_ADVERTISE_MS - elapsed);
+  }
   system_off();
 }
 

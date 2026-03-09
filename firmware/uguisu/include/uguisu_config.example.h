@@ -32,3 +32,20 @@ static constexpr uint16_t MSD_COMPANY_ID = 0xFFFF;
 #define PIN_ERROR_LED 26
 #endif
 
+// VBAT ADC: P0.31 (AIN7) through 1MΩ/1MΩ voltage divider on XIAO nRF52840.
+// Arduino pin 32 is the last entry in g_ADigitalPinMap and maps to P0.31.
+// VBAT_mV = raw_12bit * 3000mV_ref * 2 (divider comp) / 4096 ≈ 1.464 mV/LSB.
+#ifndef UGUISU_VBAT_PIN
+#  ifdef PIN_VBAT
+#    define UGUISU_VBAT_PIN  PIN_VBAT
+#  else
+#    define UGUISU_VBAT_PIN  32  // P0.31 on XIAO nRF52840
+#  endif
+#endif
+
+inline uint16_t readVbat_mv() {
+  analogReference(AR_INTERNAL_3_0);
+  analogReadResolution(12);
+  return (uint16_t)((uint32_t)analogRead(UGUISU_VBAT_PIN) * 6000u / 4096u);
+}
+

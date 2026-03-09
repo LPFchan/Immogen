@@ -80,6 +80,7 @@ VBUS present?
   yes → prov_led_task (blue pulse, FreeRTOS)
         ensure_provisioned()   [waits for PROV: serial packet]
         stop prov_led_task
+        led::off()
 
 Bluefruit.begin() / setName / setTxPower
 
@@ -88,9 +89,10 @@ wait_for_button_press_release(10 s)
 
 command = press ≥ 1 s ? Lock : Unlock
 cmd_pin = Lock ? PIN_LED_R : PIN_LED_G
-low_bat = readVbat() < LED_LOWBAT_MV_THRESHOLD
+low_bat = readVbat_mv() < LED_LOWBAT_MV_THRESHOLD
 
 [crypto: nonce → msg → AES-128-CCM MIC]
+  fail → system_off()
 
 g_store.update(counter)
 start_advertising_once()     — BLE advertising starts
