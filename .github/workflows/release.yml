@@ -1,0 +1,53 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install -U platformio
+
+      - name: Build Guillemot
+        working-directory: Guillemot/firmware
+        run: pio run
+
+      - name: Build Uguisu
+        working-directory: Uguisu/firmware
+        run: pio run
+
+      - name: Rename artifacts for release
+        run: |
+          V=${GITHUB_REF#refs/tags/v}
+          cp Guillemot/firmware/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.hex guillemot-${V}.hex
+          cp Guillemot/firmware/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.zip guillemot-${V}.zip
+          cp Uguisu/firmware/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.hex uguisu-${V}.hex
+          cp Uguisu/firmware/.pio/build/seeed_xiao_nrf52840_bluefruit/firmware.zip uguisu-${V}.zip
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            guillemot-*.hex
+            guillemot-*.zip
+            uguisu-*.hex
+            uguisu-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
