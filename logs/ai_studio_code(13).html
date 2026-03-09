@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLE Immobilizer Receiver Wiring Diagram</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      color: #58a6ff;
+      margin: 0 0 10px 0;
+    }
+    .header p {
+      color: #8b949e;
+      margin: 0;
+      max-width: 900px;
+      line-height: 1.5;
+    }
+    .svg-container {
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    /* SVG Trace Styles */
+    .wire-vcc { stroke: #f87171; stroke-width: 4; fill: none; }
+    .wire-gnd { stroke: #38bdf8; stroke-width: 4; fill: none; }
+    .wire-esc { stroke: #c084fc; stroke-width: 4; fill: none; }
+    .wire-3v3 { stroke: #4ade80; stroke-width: 2; fill: none; }
+    .wire-10v { stroke: #fbbf24; stroke-width: 2; fill: none; }
+    .wire-gate { stroke: #f97316; stroke-width: 2; fill: none; }
+    .wire-sig { stroke: #9ca3af; stroke-width: 2; fill: none; }
+    
+    /* High Current Modifier */
+    .wire-high-current { stroke-width: 8; stroke-linecap: round; }
+    
+    /* Box Styles */
+    .box { fill: #1e293b; stroke-width: 2; rx: 6; }
+    .box-pwr { stroke: #f87171; }
+    .box-logic { stroke: #4ade80; }
+    .box-analog { stroke: #fbbf24; }
+    .box-switch { stroke: #c084fc; }
+    .box-gate { stroke: #f97316; }
+
+    /* Typography */
+    .txt-title { fill: #f3f4f6; font-size: 14px; font-weight: bold; text-anchor: middle; }
+    .txt-sub { fill: #94a3b8; font-size: 11px; text-anchor: middle; }
+    .txt-label { fill: #d1d5db; font-size: 13px; font-weight: 600; }
+    .txt-small { fill: #8b949e; font-size: 11px; text-anchor: middle; }
+    .txt-pin { fill: #f97316; font-size: 12px; font-weight: bold; } /* For G/S/D labels */
+
+    /* Hover effect for traces */
+    polyline { transition: stroke-width 0.2s; }
+    polyline:hover { stroke-width: 8; cursor: crosshair; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Ninebot G30 Receiver Board Wiring Diagram</h1>
+    <p>Color codes represent voltage/signal domains. (Red: 42V, Blue: GND, Purple: Switched GND, Green: 3.3V, Yellow: 10V, Orange: Isolated Gate, Grey: Signal Logic)<br>
+    <strong style="color: #f3f4f6;">Thick traces & shaded background zones denote 30A paths requiring heavy copper pours.</strong></p>
+  </div>
+
+  <div class="svg-container">
+    <svg width="1450" height="950" viewBox="0 0 1450 950">
+      <defs>
+        <!-- Arrowhead markers -->
+        <marker id="arrow-vcc" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="#f87171" /></marker>
+        <marker id="arrow-3v3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="#4ade80" /></marker>
+        <marker id="arrow-10v" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="#fbbf24" /></marker>
+        <marker id="arrow-sig" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="#9ca3af" /></marker>
+        <marker id="arrow-gate" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="#f97316" /></marker>
+        
+        <!-- Standard Ground Symbol -->
+        <g id="sym-gnd" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" fill="none">
+          <polyline points="0,0 0,10" />
+          <polyline points="-12,10 12,10" />
+          <polyline points="-8,15 8,15" />
+          <polyline points="-4,20 4,20" />
+        </g>
+      </defs>
+
+      <!-- ================= THERMAL & HIGH CURRENT BACKGROUND ZONES ================= -->
+      
+      <!-- BAT- Ground Copper Pour Zone -->
+      <rect x="1220" y="790" width="60" height="50" fill="rgba(56, 189, 248, 0.12)" stroke="#38bdf8" stroke-dasharray="4" rx="6" />
+      <text x="1250" y="860" class="txt-small" fill="#38bdf8" font-weight="bold">BAT- Copper Plane</text>
+
+      <!-- ESC- Switched Copper Pour Zone -->
+      <rect x="1300" y="790" width="60" height="80" fill="rgba(192, 132, 252, 0.12)" stroke="#c084fc" stroke-dasharray="4" rx="6" />
+      <text x="1330" y="890" class="txt-small" fill="#c084fc" font-weight="bold">ESC- Copper Plane</text>
+
+
+      <!-- ================= MAIN POWER RAILS ================= -->
+      <polyline points="40,50 1420,50" class="wire-vcc wire-high-current" />
+      <text x="50" y="35" class="txt-label" fill="#f87171">BAT+ (36~42V) : From XT60 Male</text>
+      <text x="1410" y="35" class="txt-label" fill="#f87171" text-anchor="end">ESC+ (V+) : To XT60 Female</text>
+
+      <text x="50" y="85" class="txt-label" fill="#38bdf8">BAT- (Battery GND) : Star Ground Reference</text>
+      <polyline points="40,100 80,100 80,110" class="wire-gnd wire-high-current" />
+      <use href="#sym-gnd" x="80" y="110"/>
+
+
+      <!-- ================= 1. BUCK CONVERTER ================= -->
+      <rect x="100" y="120" width="160" height="80" class="box box-logic" />
+      <text x="180" y="155" class="txt-title">TPSM365 Buck</text>
+      <text x="180" y="175" class="txt-sub">Ultra-low Iq 3.3V Power</text>
+      
+      <circle cx="180" cy="50" r="4" fill="#f87171" />
+      <polyline points="180,50 180,120" class="wire-vcc" marker-end="url(#arrow-vcc)"/>
+      <polyline points="100,160 60,160 60,180" class="wire-gnd"/>
+      <use href="#sym-gnd" x="60" y="180"/>
+      
+      <polyline points="260,160 320,160 320,320 180,320 180,350" class="wire-3v3" marker-end="url(#arrow-3v3)"/>
+      <polyline points="320,320 500,320 500,350" class="wire-3v3" marker-end="url(#arrow-3v3)"/>
+      <circle cx="320" cy="320" r="4" fill="#4ade80" />
+
+      <!-- ================= 2. XIAO nRF52840 MCU ================= -->
+      <rect x="100" y="350" width="160" height="140" class="box box-logic" />
+      <text x="180" y="415" class="txt-title">XIAO nRF52840</text>
+      <text x="180" y="435" class="txt-sub">BLE Scan & Logic Control</text>
+      
+      <polyline points="180,490 180,510" class="wire-gnd"/>
+      <use href="#sym-gnd" x="180" y="510"/>
+
+      <!-- ================= 3. SR LATCH & POR ================= -->
+      <rect x="420" y="350" width="160" height="140" class="box box-logic" />
+      <text x="500" y="415" class="txt-title">SN74LVC2G02</text>
+      <text x="500" y="435" class="txt-sub">SR Cross-coupled Latch</text>
+      
+      <polyline points="500,490 500,510" class="wire-gnd"/>
+      <use href="#sym-gnd" x="500" y="510"/>
+
+      <polyline points="260,380 420,380" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <text x="340" y="370" class="txt-sub">D0 (SET)</text>
+      <text x="340" y="395" class="txt-small" fill="#fbbf24">100kΩ Pull-down</text>
+      
+      <polyline points="260,420 420,420" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <text x="340" y="410" class="txt-sub">D1 (RESET)</text>
+      <text x="340" y="435" class="txt-small" fill="#fbbf24">100kΩ PD + 10nF to 3.3V</text>
+
+      <polyline points="260,460 400,460 400,550 730,550" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <text x="330" y="452" class="txt-sub" text-anchor="middle">D3 (PWM 4kHz)</text>
+
+
+      <!-- ================= Q AND Q-BAR LOGIC PATHS ================= -->
+      <!-- Latch Q-bar Signal Out (Lock) -->
+      <polyline points="580,420 620,420 620,610 890,610 890,530 900,530" class="wire-sig" />
+      <text x="660" y="605" class="txt-label" text-anchor="start">Q-bar (Lock)</text>
+
+      <!-- Latch Q Signal Out (Unlock) -->
+      <!-- To Pre-Charge N-FET -->
+      <polyline points="580,380 660,380 660,710 720,710" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <text x="670" y="660" class="txt-label" text-anchor="start">Q (Unlock)</text>
+      <!-- To 2N7002 N-FET -->
+      <polyline points="660,380 660,200 390,200 390,180" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <circle cx="660" cy="380" r="4" fill="#9ca3af" />
+
+
+      <!-- ================= 4. BLEEDER GATING & PROTECTION ================= -->
+      <!-- 2N7002 Box -->
+      <rect x="370" y="120" width="140" height="60" class="box box-gate" />
+      <text x="440" y="145" class="txt-title">2N7002</text>
+      <text x="440" y="165" class="txt-sub">N-FET for P-FET Control</text>
+      
+      <!-- 2N7002 Pins -->
+      <text x="380" y="172" class="txt-pin">G</text>
+      <text x="448" y="172" class="txt-pin" fill="#38bdf8">S</text>
+      <text x="495" y="152" class="txt-pin" fill="#c084fc">D</text>
+
+      <!-- Source to GND -->
+      <polyline points="440,180 440,210" class="wire-gnd"/>
+      <use href="#sym-gnd" x="440" y="210"/>
+
+      <!-- Level Shifter & Gate Protection Group -->
+      <rect x="520" y="55" width="170" height="105" fill="none" stroke="#8b949e" stroke-dasharray="4" rx="6" />
+      <text x="605" y="152" class="txt-small" fill="#8b949e">Level Shift & Gate Protection</text>
+
+      <!-- 100kΩ Gate Drive Current Limiting Resistor -->
+      <polyline points="510,140 540,140" class="wire-sig"/>
+      <rect x="540" y="125" width="45" height="30" class="box box-gate" />
+      <text x="562.5" y="145" class="txt-small">100kΩ</text>
+      <polyline points="585,140 720,140" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      
+      <!-- Gate Protection Junction Nodes -->
+      <circle cx="610" cy="140" r="4" fill="#9ca3af" />
+      <circle cx="660" cy="140" r="4" fill="#9ca3af" />
+      
+      <!-- 1MΩ Pull-up to BAT+ (Defaults P-FET OFF) -->
+      <polyline points="610,50 610,70" class="wire-vcc"/>
+      <circle cx="610" cy="50" r="4" fill="#f87171" />
+      <rect x="590" y="70" width="40" height="30" class="box box-gate" />
+      <text x="610" y="89" class="txt-small">1MΩ</text>
+      <polyline points="610,100 610,140" class="wire-sig"/>
+      
+      <!-- 12V Zener Diode (Clamps Vgs) -->
+      <polyline points="660,50 660,70" class="wire-vcc"/>
+      <circle cx="660" cy="50" r="4" fill="#f87171" />
+      <rect x="635" y="70" width="50" height="30" class="box box-gate" />
+      <text x="660" y="89" class="txt-small">12V ▲|</text>
+      <polyline points="660,100 660,140" class="wire-sig"/>
+
+      <!-- P-FET SI2309CDS Box -->
+      <rect x="720" y="120" width="160" height="60" class="box box-pwr" />
+      <text x="800" y="145" class="txt-title">SI2309CDS</text>
+      <text x="800" y="165" class="txt-sub">Bleeder Disconnect P-FET</text>
+
+      <!-- SI2309CDS Pins -->
+      <text x="730" y="155" class="txt-pin">G</text>
+      <text x="810" y="135" class="txt-pin" fill="#f87171">S</text>
+      <text x="810" y="172" class="txt-pin" fill="#c084fc">D</text>
+
+      <polyline points="800,50 800,120" class="wire-vcc" marker-end="url(#arrow-vcc)"/>
+      <circle cx="800" cy="50" r="4" fill="#f87171" />
+      
+      <!-- ================= 5. 10V RAIL & BUZZER ================= -->
+      <!-- 10k Bleeder Box -->
+      <rect x="780" y="220" width="40" height="30" class="box box-analog" />
+      <text x="800" y="240" class="txt-small">10kΩ</text>
+
+      <polyline points="800,180 800,220" class="wire-10v"/>
+      <polyline points="800,250 800,300" class="wire-10v"/>
+
+      <!-- 10V Main Horizontal Rail -->
+      <polyline points="800,300 1050,300" class="wire-10v" />
+      <text x="880" y="290" class="txt-label" fill="#fbbf24">Node A (10V Switched Rail)</text>
+      <circle cx="800" cy="300" r="4" fill="#fbbf24" />
+
+      <!-- Buzzer Box -->
+      <rect x="720" y="350" width="160" height="60" class="box box-analog" />
+      <text x="800" y="375" class="txt-title">HNR-2304</text>
+      <text x="800" y="395" class="txt-sub">|| 4.7kΩ Discharge Res.</text>
+      
+      <polyline points="800,300 800,350" class="wire-10v" marker-end="url(#arrow-10v)"/>
+      <polyline points="800,410 800,500" class="wire-sig"/>
+
+      <!-- NPN 2 Buzzer Driver -->
+      <rect x="730" y="500" width="140" height="60" class="box box-analog" />
+      <text x="800" y="525" class="txt-title">MMBT3904</text>
+      <text x="800" y="545" class="txt-sub">Buzzer Driver NPN</text>
+      
+      <polyline points="800,560 800,580" class="wire-gnd"/>
+      <use href="#sym-gnd" x="800" y="580"/>
+
+      <!-- 10V Zener -->
+      <rect x="920" y="350" width="40" height="30" class="box box-analog"/>
+      <text x="940" y="369" class="txt-small">10V</text>
+      <polyline points="940,300 940,350" class="wire-10v"/>
+      <polyline points="940,380 940,400" class="wire-gnd"/>
+      <circle cx="940" cy="300" r="4" fill="#fbbf24" />
+      <use href="#sym-gnd" x="940" y="400"/>
+
+      <!-- 100uF Cap -->
+      <rect x="995" y="350" width="50" height="30" class="box box-analog"/>
+      <text x="1020" y="369" class="txt-small">100µF</text>
+      <polyline points="1020,300 1020,350" class="wire-10v"/>
+      <polyline points="1020,380 1020,400" class="wire-gnd"/>
+      <circle cx="1020" cy="300" r="4" fill="#fbbf24" />
+      <use href="#sym-gnd" x="1020" y="400"/>
+
+      <!-- ================= 6. GATE ISOLATION & DELAY ================= -->
+      <!-- 1N4148 Diode -->
+      <rect x="1050" y="285" width="60" height="30" class="box box-gate" />
+      <text x="1080" y="304" class="txt-small" fill="#fff">1N4148 ▶|</text>
+
+      <!-- Isolated Gate Node -->
+      <polyline points="1110,300 1290,300 1290,700" class="wire-gate" marker-end="url(#arrow-gate)" />
+      <text x="1120" y="290" class="txt-label" fill="#f97316" text-anchor="start">Isolated Gate (~9.3V)</text>
+      <circle cx="1110" cy="300" r="4" fill="#f97316" />
+      
+      <!-- 1uF Hold Cap -->
+      <rect x="1190" y="350" width="40" height="30" class="box box-gate"/>
+      <text x="1210" y="369" class="txt-small">1µF</text>
+      <polyline points="1210,300 1210,350" class="wire-gate"/>
+      <polyline points="1210,380 1210,400" class="wire-gnd"/>
+      <circle cx="1210" cy="300" r="4" fill="#f97316" />
+      <use href="#sym-gnd" x="1210" y="400"/>
+
+
+      <!-- DISCRETE RC DELAY & FAST TURN-OFF -->
+      <text x="970" y="450" class="txt-small" fill="#f97316">RC Delay / Fast Clamp</text>
+      <circle cx="900" cy="530" r="4" fill="#9ca3af" />
+      
+      <!-- 1N4148 Fast Turn-off Bypass Diode -->
+      <polyline points="900,530 900,480 940,480" class="wire-sig" />
+      <rect x="940" y="465" width="60" height="30" class="box box-gate" />
+      <text x="970" y="484" class="txt-small" fill="#fff">1N4148 ▶|</text>
+      <polyline points="1000,480 1060,480 1060,530" class="wire-sig" />
+      
+      <!-- 100kΩ Turn-ON Delay Resistor -->
+      <polyline points="900,530 940,530" class="wire-sig" />
+      <rect x="940" y="515" width="60" height="30" class="box box-gate" />
+      <text x="970" y="534" class="txt-small">100kΩ</text>
+      <polyline points="1000,530 1060,530" class="wire-sig" />
+      
+      <!-- 1µF Delay Capacitor -->
+      <circle cx="1060" cy="530" r="4" fill="#9ca3af" />
+      <polyline points="1060,530 1060,580" class="wire-sig" />
+      <rect x="1040" y="580" width="40" height="30" class="box box-gate" />
+      <text x="1060" y="599" class="txt-small">1µF</text>
+      <polyline points="1060,610 1060,640" class="wire-gnd" />
+      <use href="#sym-gnd" x="1060" y="640"/>
+
+      <!-- NPN 1 (Gate Pull-down) -->
+      <polyline points="1060,530 1100,530" class="wire-sig" marker-end="url(#arrow-sig)"/>
+      <rect x="1100" y="500" width="100" height="60" class="box box-gate" />
+      <text x="1150" y="525" class="txt-title">MMBT3904</text>
+      <text x="1150" y="545" class="txt-sub">Force Pull-down</text>
+      
+      <polyline points="1150,500 1150,300" class="wire-gate"/>
+      <polyline points="1150,560 1150,580" class="wire-gnd"/>
+      <use href="#sym-gnd" x="1150" y="580"/>
+
+
+      <!-- ================= 7. PRE-CHARGE CIRCUIT ================= -->
+      <!-- Pre-charge FET AO3422 -->
+      <rect x="720" y="680" width="120" height="60" class="box box-switch" />
+      <text x="780" y="705" class="txt-title">AO3422</text>
+      <text x="780" y="725" class="txt-sub">Pre-charge FET</text>
+      
+      <!-- AO3422 Pins -->
+      <text x="730" y="715" class="txt-pin">G</text>
+      <text x="790" y="732" class="txt-pin" fill="#38bdf8">S</text>
+      <text x="825" y="715" class="txt-pin" fill="#c084fc">D</text>
+
+      <polyline points="780,740 780,760" class="wire-gnd"/>
+      <use href="#sym-gnd" x="780" y="760"/>
+      
+      <polyline points="840,710 890,710" class="wire-sig"/>
+
+      <!-- 47R Inrush Resistor -->
+      <rect x="890" y="690" width="80" height="40" class="box box-switch" />
+      <text x="930" y="710" class="txt-title">47Ω</text>
+      <text x="930" y="725" class="txt-sub">2W</text>
+      
+      <polyline points="970,710 1000,710 1000,850" class="wire-esc" />
+      <circle cx="1000" cy="850" r="4" fill="#c084fc" />
+
+
+      <!-- ================= 8. MAIN POWER SWITCHING ================= -->
+      <!-- Main MOSFET IRF100B201 -->
+      <rect x="1220" y="700" width="140" height="80" class="box box-switch" />
+      <text x="1290" y="735" class="txt-title" fill="#c084fc">IRF100B201</text>
+      <text x="1290" y="755" class="txt-sub">Main MOSFET (100V)</text>
+      
+      <text x="1295" y="690" class="txt-pin">G</text>
+
+      <!-- MOSFET Source (Thick High Current Path) -->
+      <polyline points="1250,780 1250,820" class="wire-gnd wire-high-current" />
+      <text x="1240" y="795" class="txt-pin" fill="#38bdf8" text-anchor="end">S</text>
+      <use href="#sym-gnd" x="1250" y="820"/>
+      
+      <!-- Main ESC- Switched Trace spanning from Pre-charge to Output connector -->
+      <text x="1410" y="835" class="txt-label" fill="#c084fc" text-anchor="end">ESC- (Switched GND) : To ESC</text>
+      <polyline points="1000,850 1330,850" class="wire-esc" />
+      <polyline points="1330,850 1420,850" class="wire-esc wire-high-current" />
+
+      <!-- MOSFET Drain (Thick High Current Path) -->
+      <polyline points="1330,780 1330,850" class="wire-esc wire-high-current" />
+      <text x="1320" y="795" class="txt-pin" fill="#c084fc" text-anchor="end">D</text>
+      <circle cx="1330" cy="850" r="4" fill="#c084fc" />
+
+      <!-- TVS Diode -->
+      <polyline points="1380,850 1380,860" class="wire-esc" />
+      <polyline points="1380,890 1380,910" class="wire-gnd" />
+      <rect x="1360" y="860" width="40" height="30" class="box box-switch" stroke="#f87171"/>
+      <text x="1380" y="879" class="txt-small">TVS</text>
+      <circle cx="1380" cy="850" r="4" fill="#c084fc" />
+      <use href="#sym-gnd" x="1380" y="910"/>
+
+    </svg>
+  </div>
+</body>
+</html>

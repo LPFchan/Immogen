@@ -55,7 +55,7 @@ All timing constants live in `firmware/include/led_effects.h`. Use `tools/led_vi
 - **Unlock flow:** Short press (< 1 s) → green flash → BLE broadcast ~2 s → sleep.
 - **Lock flow:** Long press (≥ 1 s) → red flash → BLE broadcast ~2 s → sleep.
 - **Low battery:** Battery checked after button press; replaces single flash with 2 s pulse loop in the same color while advertising.
-- **Power:** < 5 μA standby, ~0.004 mAh per press (12–18 months between charges on 100 mAh LiPo). Charging via USB-C.
+- **Power:** ~30 μA standby (nRF52840 system-off + XIAO charging IC), ~0.006 mAh per press (12–18 months between charges on 400 mAh LiPo). Charging via USB-C.
 
 ### Design Notes
 
