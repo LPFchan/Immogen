@@ -1,3 +1,0 @@
-[submodule "firmware/uguisu/lib/ImmoCommon"]
-	path = firmware/uguisu/lib/ImmoCommon
-	url = https://github.com/LPFchan/ImmoCommon.git
