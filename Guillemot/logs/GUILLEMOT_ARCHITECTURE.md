@@ -51,7 +51,7 @@ Stores compile-time constants:
 
 ## 3. ImmoCommon Library
 
-Stored in `lib/ImmoCommon`, this submodule is shared between the Guillemot receiver and the Uguisu fob. It contains the cryptographic primitives, flash storage management, and serial provisioning flow.
+Stored in `lib/`, this shared code is between the Guillemot receiver and the Uguisu fob. It contains the cryptographic primitives, flash storage management, and serial provisioning flow.
 
 ### Cryptography (`immo_crypto.cpp` / `.h`)
 Implements AES-128 CCM (Counter with CBC-MAC) for payload authentication without requiring heavy cryptographic libraries.

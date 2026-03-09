@@ -51,7 +51,7 @@ lib_ldf_mode = deep+   ; <-- Add this
 build_flags =
   ; ... other flags ...
   -D CFG_TUSB_CONFIG_FILE=\"immo_tusb_config.h\"   ; <-- Add this
-  -I lib/ImmoCommon/src                            ; <-- Add this
+  -I ../../lib                            ; <-- Add this
   -I ".pio/libdeps/your_board_name/Adafruit TinyUSB Library/src"
 ```
 
