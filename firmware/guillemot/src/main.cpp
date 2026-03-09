@@ -31,22 +31,8 @@ static void load_psk_from_storage() {
   immo::prov_load_key_or_zero(immo::DEFAULT_PROV_PATH, g_psk);
 }
 
-void latch_set_pulse() {
-  digitalWrite(PIN_LATCH_RESET, LOW);
-  digitalWrite(PIN_LATCH_SET, HIGH);
-  delay(LATCH_PULSE_MS);
-  digitalWrite(PIN_LATCH_SET, LOW);
-}
-
-void latch_reset_pulse() {
-  digitalWrite(PIN_LATCH_SET, LOW);
-  digitalWrite(PIN_LATCH_RESET, HIGH);
-  delay(LATCH_PULSE_MS);
-  digitalWrite(PIN_LATCH_RESET, LOW);
-}
-
-void buzzer_tone_ms(uint16_t duration_ms) {
-  tone(PIN_BUZZER, BUZZER_HZ, duration_ms);
+void buzzer_tone_ms(uint16_t hz, uint16_t duration_ms) {
+  tone(PIN_BUZZER, hz, duration_ms);
   delay(duration_ms);
   noTone(PIN_BUZZER);
 }
@@ -88,10 +74,12 @@ void handle_valid_command(const immo::Payload& pl) {
   switch (pl.command) {
     case immo::Command::Unlock:
       latch_set_pulse();
-      buzzer_tone_ms(BUZZER_UNLOCK_MS);
+      buzzer_tone_ms(BUZZER_LOW_HZ,  BUZZER_LOW_MS);
+      buzzer_tone_ms(BUZZER_HIGH_HZ, BUZZER_HIGH_MS);
       break;
     case immo::Command::Lock:
-      buzzer_tone_ms(BUZZER_LOCK_MS);
+      buzzer_tone_ms(BUZZER_HIGH_HZ, BUZZER_HIGH_MS);
+      buzzer_tone_ms(BUZZER_LOW_HZ,  BUZZER_LOW_MS);
       latch_reset_pulse();
       break;
     default:
