@@ -1,6 +1,6 @@
 {
   "name": "ImmoCommon",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Shared crypto, provisioning, and storage for Immogen BLE immobilizer",
   "keywords": "immo, ble, crypto, provisioning",
   "frameworks": "arduino",
