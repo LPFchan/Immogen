@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLE Timing Simulator — Uguisu / Guillemot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    /* Main elements capped at 800px and centered */
+    h1, .grid, .controls-bar, .stats-grid,
+    .breakdown-title, .power-grid, .phase-strip-wrap {
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Timeline canvas spans full window width */
+    .canvas-wrap { width: 100%; }
+
+    h1 {
+      font-size: 13px;
+      color: #58a6ff;
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .panel-title {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .g-title { color: #58a6ff; }
+    .u-title { color: #3fb950; }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 9px;
+    }
+    .row:last-child { margin-bottom: 0; }
+
+    .row label {
+      font-size: 11px;
+      color: #8b949e;
+      min-width: 100px;
+    }
+
+    input[type=range] {
+      flex: 1;
+      accent-color: #58a6ff;
+      cursor: pointer;
+    }
+
+    .val {
+      min-width: 62px;
+      text-align: right;
+      font-size: 11px;
+      color: #f0f6fc;
+      font-weight: bold;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+    }
+
+    .press-btn {
+      background: #238636;
+      color: #fff;
+      border: 1px solid #2ea043;
+      padding: 10px 28px;
+      border-radius: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .press-btn:hover { background: #2ea043; }
+    .press-btn:active { background: #196127; transform: scale(0.97); }
+
+    .canvas-wrap {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    /* Canvas sized by JS; CSS just ensures it fills the wrapper */
+    canvas { display: block; width: 100%; height: 240px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .stat {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .stat-val {
+      font-size: 20px;
+      font-weight: bold;
+      color: #58a6ff;
+    }
+
+    .breakdown-title {
+      font-size: 9px;
+      color: #484f58;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      padding-left: 2px;
+    }
+
+    .hit   { color: #3fb950 !important; }
+    .late  { color: #f0883e !important; }
+    .miss  { color: #f85149 !important; }
+    .vfast { color: #58a6ff !important; }
+
+    /* Phase distribution strip */
+    #phaseStrip { display: block; width: 100%; height: 32px; }
+
+    .power-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .power-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .power-title {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .power-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .power-stat {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .power-stat .stat-label { font-size: 9px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .power-stat .stat-val   { font-size: 17px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h1>BLE Timing Simulator — Uguisu / Guillemot</h1>
+
+<div class="grid">
+  <div class="panel">
+    <div class="panel-title g-title">Guillemot — Scanner (Receiver)</div>
+    <div class="row">
+      <label>Scan Interval</label>
+      <input type="range" id="scanInterval" min="200" max="3000" step="50" value="500">
+      <span class="val" id="scanIntervalVal">500 ms</span>
+    </div>
+    <div class="row">
+      <label>Scan Window</label>
+      <input type="range" id="scanWindow" min="10" max="200" step="5" value="20">
+      <span class="val" id="scanWindowVal">20 ms</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title u-title">Uguisu — Fob (Transmitter)</div>
+    <div class="row">
+      <label>Advertise Duration</label>
+      <input type="range" id="advDuration" min="200" max="3000" step="50" value="600">
+      <span class="val" id="advDurationVal">600 ms</span>
+    </div>
+    <div class="row">
+      <label>Packet Interval</label>
+      <input type="range" id="advInterval" min="20" max="200" step="10" value="20">
+      <span class="val" id="advIntervalVal">20 ms</span>
+    </div>
+  </div>
+</div>
+
+<div class="controls-bar">
+  <button class="press-btn" id="pressBtn">▶  PRESS FOB BUTTON</button>
+  <div class="row" style="flex:1; margin:0;">
+    <label style="min-width:110px; font-size:11px; color:#8b949e;">Playback Speed</label>
+    <input type="range" id="simSpeed" min="1" max="80" step="1" value="15">
+    <span class="val" id="simSpeedVal">15× slow</span>
+  </div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="timeline"></canvas>
+</div>
+
+<!-- Phase distribution strip -->
+<div class="breakdown-title phase-strip-wrap" style="margin-top:10px;">Phase distribution — 500 samples
+  <span style="margin-left:14px; color:#58a6ff;">■ very fast (&lt;250 ms)</span>
+  <span style="margin-left:10px; color:#3fb950;">■ fast (&lt;500 ms)</span>
+  <span style="margin-left:10px; color:#d29922;">■ slow (&lt;1 s)</span>
+  <span style="margin-left:10px; color:#f0883e;">■ very slow (&gt;1 s)</span>
+  <span style="margin-left:10px; color:#484f58;">■ miss</span>
+</div>
+<div class="canvas-wrap phase-strip-wrap" style="margin-bottom:6px;">
+  <canvas id="phaseStrip"></canvas>
+</div>
+<div class="controls-bar phase-strip-wrap" style="margin-bottom:10px; padding: 8px 14px;">
+  <div class="row" style="flex:1; margin:0;">
+    <label style="min-width:90px; font-size:11px; color:#8b949e;">Phase offset</label>
+    <input type="range" id="phaseSlider" min="0" max="499" step="1" value="0">
+    <span class="val" id="phaseSliderVal" style="min-width:62px;">phase 0</span>
+  </div>
+</div>
+
+<!-- Row 1: summary stats -->
+<div class="stats-grid">
+  <div class="stat">
+    <div class="stat-label">P(hit / packet)</div>
+    <div class="stat-val" id="statHit">4.0%</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Total Packets</div>
+    <div class="stat-val" id="statPackets">60</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">P(detect)</div>
+    <div class="stat-val" id="statDetect">91%</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">P(late response)</div>
+    <div class="stat-val" id="statLate">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Worst response</div>
+    <div class="stat-val" id="statWorst">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Expected Presses</div>
+    <div class="stat-val" id="statExpected">1.1×</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">This Press</div>
+    <div class="stat-val" id="statResult">—</div>
+  </div>
+</div>
+
+<!-- Row 2: battery life -->
+<div class="breakdown-title" style="margin-top:10px;">Battery drain</div>
+<div class="power-grid">
+
+  <div class="power-panel">
+    <div class="power-title g-title">Guillemot — Scooter Battery (G30: 15.3 Ah)</div>
+    <div class="power-stats">
+      <div class="power-stat">
+        <div class="stat-label">Scan current</div>
+        <div class="stat-val" id="pwrGCurrent" style="color:#58a6ff;">88 μA</div>
+      </div>
+      <div class="power-stat">
+        <div class="stat-label">Time to drain</div>
+        <div class="stat-val" id="pwrGLife" style="color:#58a6ff;">19.8 yr</div>
+      </div>
+    </div>
+    <div style="font-size:9px; color:#484f58; line-height:1.5;">
+      Measured from scooter's 36 V battery. Scales linearly with scan duty cycle.
+      Baseline: 22 μA at 1% duty (2000/20 ms).
+    </div>
+  </div>
+
+  <div class="power-panel">
+    <div class="power-title u-title">Uguisu — Fob Battery (400 mAh LiPo)</div>
+    <div class="power-stats">
+      <div class="power-stat">
+        <div class="stat-label">Energy / press</div>
+        <div class="stat-val" id="pwrUPress" style="color:#3fb950;">12 μAh</div>
+      </div>
+      <div class="power-stat">
+        <div class="stat-label">Time to drain</div>
+        <div class="stat-val" id="pwrULife" style="color:#3fb950;">7.0 yr</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px; margin-bottom:0;">
+      <label style="min-width:120px; font-size:11px; color:#8b949e;">Presses / day</label>
+      <input type="range" id="pressesPerDay" min="1" max="30" step="1" value="3">
+      <span class="val" id="pressesPerDayVal" style="min-width:50px;">3</span>
+    </div>
+    <div style="font-size:9px; color:#484f58; margin-top:8px; line-height:1.5;">
+      Radio only. ~30 μA standby (nRF52840 system-off + XIAO charging IC).
+      Baseline: 0.004 mAh/press at 20 packets. LED adds ~0.002 mAh/press (not shown).
+      Standby dominates — press count has negligible effect on battery life.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const canvas = document.getElementById('timeline');
+  const ctx    = canvas.getContext('2d');
+
+  const CANVAS_CSS_H = 240;  // logical canvas height in CSS px
+  const PAD          = 20;   // left/right padding inside canvas
+
+  let animId      = null;
+  let currentSim  = null;
+
+  // ── HiDPI canvas setup ────────────────────────────────────────────────────
+  // Call at the start of every draw() to resize the pixel buffer to match the
+  // CSS layout size at the screen's devicePixelRatio. Returns logical {W, H}.
+
+  function prepareCanvas() {
+    const dpr  = window.devicePixelRatio || 1;
+    const cssW = canvas.getBoundingClientRect().width || canvas.offsetWidth || 900;
+    const cssH = CANVAS_CSS_H;
+
+    canvas.width  = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+
+    // Reset transform then scale so all draw calls use CSS-pixel coordinates
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    return { W: cssW, H: cssH };
+  }
+
+  // ── Parameter helpers ─────────────────────────────────────────────────────
+
+  function getParams() {
+    return {
+      scanInterval: +document.getElementById('scanInterval').value,
+      scanWindow:   +document.getElementById('scanWindow').value,
+      advDuration:  +document.getElementById('advDuration').value,
+      advInterval:  +document.getElementById('advInterval').value,
+      simSpeed:     +document.getElementById('simSpeed').value,
+    };
+  }
+
+  function updateLabels() {
+    const p = getParams();
+    document.getElementById('scanIntervalVal').textContent = p.scanInterval + ' ms';
+    document.getElementById('scanWindowVal').textContent   = p.scanWindow   + ' ms';
+    document.getElementById('advDurationVal').textContent  = p.advDuration  + ' ms';
+    document.getElementById('advIntervalVal').textContent  = p.advInterval  + ' ms';
+    document.getElementById('simSpeedVal').textContent     =
+      p.simSpeed === 1 ? '1× live' : p.simSpeed + '× slow';
+    updateStats(p);
+  }
+
+  function calcPhaseStats(p) {
+    // Sample 500 evenly-spaced unique phases across one full scan interval.
+    // Returns per-bucket counts and a 'buckets' array for the strip.
+    const SAMPLES = 500;
+    const buckets = [];
+    let vfast = 0, fast = 0, slow = 0, vslow = 0, miss = 0;
+    let worstHit = null;
+    for (let i = 0; i < SAMPLES; i++) {
+      const phase = (i / SAMPLES) * p.scanInterval;
+      const { firstHit } = buildSim(p, phase);
+      if      (firstHit === null)  { buckets.push('miss');  miss++;  }
+      else if (firstHit <= 250)    { buckets.push('vfast'); vfast++; }
+      else if (firstHit <= 500)    { buckets.push('fast');  fast++;  }
+      else if (firstHit <= 1000)   { buckets.push('slow');  slow++;  }
+      else                         { buckets.push('vslow'); vslow++; }
+      if (firstHit !== null) worstHit = worstHit === null ? firstHit : Math.max(worstHit, firstHit);
+    }
+    return { buckets, vfast, fast, slow, vslow, miss, total: SAMPLES, worstHit };
+  }
+
+  function drawPhaseStrip(phaseStats) {
+    const sc   = document.getElementById('phaseStrip');
+    const dpr  = window.devicePixelRatio || 1;
+    const cssW = sc.getBoundingClientRect().width || sc.offsetWidth || 900;
+    const cssH = 32;
+    sc.width   = Math.round(cssW * dpr);
+    sc.height  = Math.round(cssH * dpr);
+    const sc2  = sc.getContext('2d');
+    sc2.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    sc2.clearRect(0, 0, cssW, cssH);
+
+    const { vfast, fast, slow, vslow, miss, total } = phaseStats;
+    const R = cssH / 2;  // corner radius = half height → pill shape
+
+    // Fixed order: blue → green → amber → orange → gray
+    const segments = [
+      { count: vfast, color: '#58a6ff' },
+      { count: fast,  color: '#3fb950' },
+      { count: slow,  color: '#d29922' },
+      { count: vslow, color: '#f0883e' },
+      { count: miss,  color: '#484f58' },
+    ].filter(s => s.count > 0);
+
+    // Draw full pill background first (covers rounded ends), then fill segments.
+    // Step 1: clip to pill shape
+    sc2.save();
+    const pill = new Path2D();
+    pill.roundRect(0, 0, cssW, cssH, R);
+    sc2.clip(pill);
+
+    // Step 2: draw each segment as a plain rect (clipping gives rounded ends)
+    let x = 0;
+    for (const seg of segments) {
+      const w = (seg.count / total) * cssW;
+      sc2.fillStyle = seg.color;
+      sc2.fillRect(x, 0, w + 0.5, cssH);  // +0.5 closes sub-pixel seams
+      x += w;
+    }
+
+    sc2.restore();
+  }
+
+  function updateStats(p) {
+    const pHit         = p.scanWindow / p.scanInterval;
+    const N            = Math.floor(p.advDuration / p.advInterval) + 1;
+    const pDetect      = 1 - Math.pow(1 - pHit, N);
+
+    // Simulation-based phase stats
+    const ps         = calcPhaseStats(p);
+    const detected   = ps.vfast + ps.fast + ps.slow + ps.vslow;
+    const simDetect  = detected / ps.total;
+    const pLate      = detected > 0 ? ps.vslow / detected : 0;
+
+    drawPhaseStrip(ps);
+
+    document.getElementById('statHit').textContent       = (pHit * 100).toFixed(1) + '%';
+    document.getElementById('statPackets').textContent   = N;
+    document.getElementById('statDetect').textContent    = (simDetect * 100).toFixed(1) + '%';
+    document.getElementById('statLate').textContent      = detected > 0 ? (pLate * 100).toFixed(1) + '%' : '—';
+    document.getElementById('statLate').className        = 'stat-val' + (pLate > 0 ? ' late' : '');
+
+    const worstEl = document.getElementById('statWorst');
+    if (ps.miss > 0) {
+      worstEl.textContent = 'MISS';
+      worstEl.style.color = '#f85149';
+    } else if (ps.worstHit !== null) {
+      worstEl.textContent = ps.worstHit + ' ms';
+      worstEl.style.color = hitColor(ps.worstHit);
+    } else {
+      worstEl.textContent = '—';
+      worstEl.style.color = '';
+    }
+
+    document.getElementById('statExpected').textContent  = simDetect > 0 ? (1 / simDetect).toFixed(1) + '×' : '∞';
+    updatePower(p);
+  }
+
+  function fmtDuration(hours) {
+    if (hours < 24)       return hours.toFixed(1) + ' hr';
+    if (hours < 24 * 30)  return (hours / 24).toFixed(1) + ' days';
+    if (hours < 24 * 365) return (hours / 24 / 30.44).toFixed(1) + ' mo';
+    return (hours / 24 / 365.25).toFixed(1) + ' yr';
+  }
+
+  function fmtCurrent(uA) {
+    if (uA >= 1000) return (uA / 1000).toFixed(2) + ' mA';
+    return uA.toFixed(1) + ' μA';
+  }
+
+  function updatePower(p) {
+    const pressesPerDay = +document.getElementById('pressesPerDay').value;
+    document.getElementById('pressesPerDayVal').textContent = pressesPerDay;
+
+    // ── Guillemot ──
+    // README: ~22 μA (locked) from scooter's 36 V battery at 1% duty (2000/20 ms).
+    // Breakdown: ~5 μA static (TPSM365R6V3 buck Iq ~4 μA + SR latch ~1 μA) +
+    //            ~17 μA scan component at 1% duty.
+    // Only the scan component scales with duty cycle; static is always on.
+    const duty_frac      = p.scanWindow / p.scanInterval;
+    const G_STATIC_uA    = 5;                             // buck Iq + latch (constant)
+    const G_SCAN_1PCT_uA = 17;                            // scan at 1% duty (22 - 5)
+    const gCurrent_uA    = G_STATIC_uA + G_SCAN_1PCT_uA * (duty_frac / 0.01);
+    const G30_mAh        = 15300;                         // 15.3 Ah = 15300 mAh
+    const gLife_hours    = G30_mAh / (gCurrent_uA / 1000);
+
+    document.getElementById('pwrGCurrent').textContent = fmtCurrent(gCurrent_uA);
+    document.getElementById('pwrGLife').textContent    = fmtDuration(gLife_hours);
+
+    // ── Uguisu ──
+    // Baseline: 0.004 mAh per press at 20 packets → 0.0002 mAh per packet.
+    const N             = Math.floor(p.advDuration / p.advInterval) + 1;
+    const uPress_mAh    = N * 0.0002;                     // mAh per button press (radio only)
+    const standby_mAh   = 30e-3 * 24;                     // ~30 μA * 24 h = 0.72 mAh/day (nRF52840 system-off + XIAO charging IC quiescent)
+    const daily_mAh     = pressesPerDay * uPress_mAh + standby_mAh;
+    const uLife_hours   = (400 / daily_mAh) * 24;         // 400 mAh battery
+
+    document.getElementById('pwrUPress').textContent = (uPress_mAh * 1000).toFixed(1) + ' μAh';
+    document.getElementById('pwrULife').textContent  = fmtDuration(uLife_hours);
+  }
+
+  // ── Simulation builder ────────────────────────────────────────────────────
+
+  function buildSim(p, phase) {
+    const packets = [];
+    for (let t = 0; t <= p.advDuration; t += p.advInterval) packets.push(t);
+
+    // phase = how far into its current scan interval the scanner is at button-press time
+    const windows = [];
+    for (let t = -phase; t <= p.advDuration; t += p.scanInterval) {
+      const ws = t, we = t + p.scanWindow;
+      if (we > 0 && ws <= p.advDuration) windows.push({ start: ws, end: we });
+    }
+
+    const detected = new Set();
+    let firstHit = null;
+    for (const pkt of packets) {
+      for (const w of windows) {
+        if (pkt >= w.start && pkt <= w.end) {
+          detected.add(pkt);
+          if (firstHit === null) firstHit = pkt;
+          break;
+        }
+      }
+    }
+
+    return { packets, windows, detected, firstHit };
+  }
+
+  // ── Timing colour helpers ─────────────────────────────────────────────────
+
+  function hitColor(t) {
+    if (t <= 250)  return '#58a6ff';   // very fast — blue
+    if (t <= 500)  return '#3fb950';   // fast      — green
+    if (t <= 1000) return '#d29922';   // slow      — amber
+    return                '#f0883e';   // very slow — orange
+  }
+
+  function rgba(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // ── Drawing ───────────────────────────────────────────────────────────────
+
+  function draw(p, sim, cursorTime) {
+    const { W, H } = prepareCanvas();
+
+    const plotW = W - PAD * 2;
+    const tX    = t => PAD + (t / p.advDuration) * plotW;
+    const clamp = x => Math.max(PAD, Math.min(PAD + plotW, x));
+
+    // Track layout (in CSS px)
+    const GT     = { y: 38,  h: 72 };
+    const UT     = { y: 150, h: 72 };
+    const AXIS_Y = H - 14;
+
+    // ── Background ──
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Time grid lines + tick labels ──
+    const tickMs = p.advDuration <= 2000 ? 200 : p.advDuration <= 4000 ? 500 : 1000;
+    for (let t = 0; t <= p.advDuration; t += tickMs) {
+      const x = Math.round(tX(t));
+      ctx.fillStyle = '#1c2128';
+      ctx.fillRect(x, GT.y, 1, AXIS_Y - GT.y);
+      ctx.fillStyle = '#484f58';
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillText(t + 'ms', x + 3, AXIS_Y + 11);
+    }
+
+    // ── Track backgrounds ──
+    [GT, UT].forEach(tr => {
+      ctx.fillStyle = '#0a0f16';
+      ctx.fillRect(PAD, tr.y, plotW, tr.h);
+      ctx.strokeStyle = '#21262d';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD, tr.y, plotW, tr.h);
+    });
+
+    // ── Track labels ──
+    ctx.font = '700 10px JetBrains Mono, monospace';
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillText('GUILLEMOT — scanner window', PAD, GT.y - 6);
+    ctx.fillStyle = '#3fb950';
+    ctx.fillText('UGUISU — advertisement packets', PAD, UT.y - 6);
+
+    if (!sim) {
+      ctx.fillStyle = 'rgba(88,166,255,0.4)';
+      ctx.font = '12px JetBrains Mono, monospace';
+      const msg = 'Press the FOB button to simulate a button press';
+      ctx.fillText(msg, W / 2 - ctx.measureText(msg).width / 2, H / 2 + 4);
+      return;
+    }
+
+    // ── Guillemot scanner windows ──
+    for (const w of sim.windows) {
+      const x1 = clamp(tX(w.start));
+      const x2 = clamp(tX(w.end));
+      if (x2 <= x1) continue;
+
+      const hitsInWin   = [...sim.detected].filter(p => p >= w.start && p <= w.end);
+      const winFirst    = hitsInWin.length > 0 ? Math.min(...hitsInWin) : null;
+      const isFirstWin  = winFirst === sim.firstHit && winFirst !== null;
+      const c           = winFirst !== null ? hitColor(winFirst) : null;
+
+      ctx.fillStyle   = c ? rgba(c, isFirstWin ? 0.22 : 0.12) : 'rgba(88,166,255,0.07)';
+      ctx.fillRect(x1, GT.y, x2 - x1, GT.h);
+      ctx.strokeStyle = c ? c : '#2a5a8a';
+      ctx.lineWidth   = isFirstWin ? 2 : 1;
+      ctx.strokeRect(x1, GT.y, x2 - x1, GT.h);
+
+      if (x2 - x1 > 18) {
+        ctx.fillStyle = c ? c : '#3a6a9a';
+        ctx.font = '9px JetBrains Mono, monospace';
+        ctx.fillText('RX', x1 + 4, GT.y + GT.h / 2 + 4);
+      }
+    }
+
+    // ── Uguisu packets ──
+    for (const pkt of sim.packets) {
+      if (cursorTime !== null && pkt > cursorTime) continue;
+
+      const x       = Math.round(tX(pkt));
+      const isHit   = sim.detected.has(pkt);
+      const isFirst = pkt === sim.firstHit;
+
+      if (isHit) {
+        const c = hitColor(pkt);
+        ctx.fillStyle = rgba(c, 0.18);
+        ctx.fillRect(x - 3, UT.y, 6, UT.h);
+        ctx.fillStyle = c;
+        ctx.fillRect(x - 1.5, UT.y, 3, UT.h);
+
+        // Dotted connector to the scanner window
+        ctx.strokeStyle = rgba(c, isFirst ? 0.65 : 0.35);
+        ctx.lineWidth   = isFirst ? 2 : 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, UT.y);
+        ctx.lineTo(x, GT.y + GT.h);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = '#1c1c28';
+        ctx.fillRect(x - 1, UT.y + 6, 2, UT.h - 12);
+        ctx.fillStyle = '#3a3a50';
+        ctx.fillRect(x - 1, UT.y, 2, 7);
+      }
+    }
+
+    // ── Animated cursor ──
+    if (cursorTime !== null && cursorTime < p.advDuration) {
+      const cx = Math.round(tX(cursorTime));
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(cx, GT.y);
+      ctx.lineTo(cx, AXIS_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── Result banner ──
+    const isDone = cursorTime === null;
+    const showBanner = isDone || (sim.firstHit !== null && cursorTime >= sim.firstHit);
+    if (showBanner) {
+      if (sim.firstHit !== null) {
+        const c   = hitColor(sim.firstHit);
+        const msg = `✓  DETECTED  —  first hit at ${sim.firstHit} ms`;
+        renderBanner(msg, c, rgba(c, 0.08), W);
+      } else if (isDone) {
+        const msg = '✗  MISSED  —  no packet landed in any scan window';
+        renderBanner(msg, '#f85149', 'rgba(248,81,73,0.08)', W);
+      }
+    }
+  }
+
+  function renderBanner(msg, color, bg, W) {
+    ctx.font = '700 11px JetBrains Mono, monospace';
+    const tw = ctx.measureText(msg).width;
+    ctx.fillStyle = bg;
+    ctx.fillRect(W / 2 - tw / 2 - 12, 2, tw + 24, 18);
+    ctx.fillStyle = color;
+    ctx.fillText(msg, W / 2 - tw / 2, 14);
+  }
+
+  // ── Button press ──────────────────────────────────────────────────────────
+
+  function pressButton() {
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+    const p     = getParams();
+    const phase = Math.random() * p.scanInterval;
+    const sim   = buildSim(p, phase);
+    currentSim  = sim;
+
+    const el = document.getElementById('statResult');
+    el.textContent = sim.firstHit !== null ? 'HIT ✓' : 'MISS ✗';
+    el.className   = 'stat-val ' + (sim.firstHit !== null ? 'hit' : 'miss');
+
+    // simSpeed=1 → real time; simSpeed=N → N× slower
+    const wallDur = p.advDuration * p.simSpeed;
+    const t0      = performance.now();
+
+    function frame(now) {
+      const simT = Math.min(((now - t0) / wallDur) * p.advDuration, p.advDuration);
+      draw(p, sim, simT < p.advDuration ? simT : null);
+      if (simT < p.advDuration) {
+        animId = requestAnimationFrame(frame);
+      } else {
+        animId = null;
+      }
+    }
+
+    animId = requestAnimationFrame(frame);
+  }
+
+  // ── Slider listeners ──────────────────────────────────────────────────────
+
+  document.getElementById('pressesPerDay').addEventListener('input', () => {
+    updatePower(getParams());
+  });
+
+  ['scanInterval', 'scanWindow', 'advDuration', 'advInterval', 'simSpeed'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      if (animId) { cancelAnimationFrame(animId); animId = null; }
+      updateLabels();
+      draw(getParams(), currentSim, null);
+    });
+  });
+
+  document.getElementById('pressBtn').addEventListener('click', pressButton);
+
+  document.getElementById('phaseSlider').addEventListener('input', () => {
+    const p      = getParams();
+    const idx    = +document.getElementById('phaseSlider').value;
+    const phase  = (idx / 500) * p.scanInterval;
+    const sim    = buildSim(p, phase);
+    currentSim   = sim;
+
+    document.getElementById('phaseSliderVal').textContent = 'phase ' + idx;
+
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    draw(p, sim, null);
+
+    const el = document.getElementById('statResult');
+    el.textContent = sim.firstHit !== null ? 'HIT ✓' : 'MISS ✗';
+    el.className   = 'stat-val ' + (sim.firstHit !== null ? 'hit' : 'miss');
+  });
+
+  window.addEventListener('resize', () => {
+    const p = getParams();
+    draw(p, currentSim, null);
+    drawPhaseStrip(calcPhaseStats(p));
+  });
+
+  // ── Initial render ────────────────────────────────────────────────────────
+
+  updateLabels();
+  draw(getParams(), null, null);
+</script>
+</body>
+</html>

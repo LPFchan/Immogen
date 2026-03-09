@@ -20,10 +20,11 @@ static constexpr uint16_t MSD_COMPANY_ID = 0xFFFF;
 #define PIN_LED_G D3
 
 // How long to advertise after a press (ms).
-#define UGUISU_ADVERTISE_MS 2000
+#define UGUISU_ADVERTISE_MS 600
 
 // How often to send advertisement packets while active (ms).
-#define UGUISU_ADV_INTERVAL_MS 100
+// Minimum achievable with nRF52840 SoftDevice S140 legacy advertising: 20 ms.
+#define UGUISU_ADV_INTERVAL_MS 20
 
 // Long-press threshold for lock command (ms). Press >= this = Lock, else Unlock.
 #define UGUISU_LONG_PRESS_MS 1000
