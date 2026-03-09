@@ -1,0 +1,3 @@
+[submodule "firmware/guillemot/lib/ImmoCommon"]
+	path = firmware/guillemot/lib/ImmoCommon
+	url = https://github.com/LPFchan/ImmoCommon.git
