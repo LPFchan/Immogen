@@ -1,104 +1,187 @@
-# Pipit: Companion App Architecture & Technical Writeup
+# Pipit: Companion App Architecture
 
 *Date: 2026-03-10*
 
-**Status:** Architectural Blueprint & Rationale
-**Scope:** Architecture for the "Pipit" companion iOS/Android app, cross-platform core, UI framework, BLE strategy, and key provisioning.
+**Status:** Architectural Blueprint
+**Scope:** Complete architecture for the Pipit companion iOS/Android app — tech stack, BLE design, key management, provisioning, and platform constraints.
 
 ---
 
-## 1. Executive Summary
+## 1. Overview
 
-**Pipit** is the companion iOS and Android application for the Immogen vehicle immobilizer ecosystem. Named to follow the ornithological theme (Guillemot, Uguisu, Whimbrel), Pipit serves two primary functions:
+**Pipit** is the companion app for the Immogen immobilizer ecosystem (following the ornithological naming: Guillemot, Uguisu, Whimbrel). It provides:
 
-1. **Proximity Unlock (Background):** A low-power background service that detects when the user approaches the vehicle and automatically unlocks Guillemot, with an adjustable proximity threshold.
-2. **Active Key Fob (Foreground):** A user interface to manually lock and unlock the vehicle, functioning identically to the Uguisu hardware fob.
+1. **Proximity Unlock (Background):** Low-power background BLE service that detects the vehicle and automatically unlocks Guillemot, with an adjustable proximity threshold.
+2. **Active Key Fob (Foreground):** Manual lock/unlock UI, functionally identical to the Uguisu hardware fob.
 
-To balance cross-platform efficiency with platform-native performance, Pipit uses **Kotlin Multiplatform (KMP)** for shared business logic while maintaining strictly native UI frameworks (**SwiftUI/UIKit** for iOS, **Jetpack Compose** for Android).
-
----
-
-## 2. Core Architecture Decisions & Rationale
-
-### 2.1 Cross-Platform Core: Kotlin Multiplatform (KMP)
-Rather than writing the business logic twice (Swift for iOS, Kotlin for Android) or wrapping the existing C++ firmware codebase (`immo_crypto.cpp`) in JNI/Objective-C++, we elected to use **Kotlin Multiplatform**.
-
-**Rationale:**
-* **Developer Experience:** Native Kotlin development provides zero friction on Android and compiles to a highly performant, Swift-friendly native framework for iOS.
-* **Memory Safety:** KMP offers a modern, memory-safe environment compared to maintaining manual memory management via C++ wrappers.
-* **Trade-off:** The primary trade-off is the need to port the existing C++ AES-CCM (RFC3610) cryptography and MAC logic into pure Kotlin. To mitigate risks, this KMP implementation will be exhaustively unit-tested against the existing C++ test vectors to guarantee bit-for-bit parity.
-
-### 2.2 User Interface: Platform-Native (Compose & SwiftUI)
-The application will not use cross-platform UI frameworks like Flutter or React Native.
-
-**Rationale:**
-* **Native Feel:** The app must feel like a first-class citizen on both platforms. 
-* **Hardware Integration:** BLE interactions, camera usage (for QR scanning), and secure enclave access are deeply intertwined with the UI/UX. Relying on native toolkits—**Jetpack Compose** for Android and **SwiftUI/UIKit** for iOS—ensures smooth, reliable integrations with platform-specific APIs.
-
-### 2.3 Provisioning Strategy: QR Code & Secure Enclave
-To provision a phone as a trusted key, Pipit will use the device's camera to scan a QR code displayed by **Whimbrel** (during initial setup) or by **another Pipit instance** (for subsequent phones, post-installation).
-
-The QR code encodes a provisioning URI containing the slot key and a 6-digit management PIN: `immogen://prov?slot=<n>&key=<hex>&ctr=0&pin=<6digits>`. The management PIN enables BLE-authenticated key slot management after installation (see Integration Requirements doc §1.3).
-
-**Rationale:**
-* **Security & Usability:** QR codes provide a high-bandwidth, air-gapped method of securely transferring root cryptographic keys without pairing over a vulnerable, unencrypted BLE channel.
-* **Storage:** Once scanned, the slot key is stored strictly within the device's hardware-backed keystores: **Android Keystore** and **iOS Keychain**. The management PIN is stored alongside it. These secrets never touch plaintext storage, ensuring the app remains secure even if the host OS is compromised.
-* **Pipit as Provisioning Client:** A provisioned Pipit instance can authenticate to Guillemot over BLE using the management PIN and perform key management post-installation — provisioning additional phones (displaying QR codes), revoking lost devices, and changing the management PIN. On **Android**, Pipit additionally supports USB operations via OTG: firmware flashing (UF2 mass storage via `libaums`) and Uguisu fob provisioning (CDC serial via `usb-serial-for-android`). On **iOS**, USB operations are not available (no USB device API); these require Whimbrel on a laptop. See the Integration Requirements doc §4 for the full platform capability matrix.
+Architecture: **Kotlin Multiplatform (KMP)** for shared business logic, with native UI (**UIKit** on iOS, **Jetpack Compose** on Android).
 
 ---
 
-## 3. Background BLE Architecture (The iOS Challenge)
+## 2. Tech Stack
 
-The most complex requirement is ensuring reliable background proximity unlock, particularly on iOS. 
+### 2.1 Cross-Platform Core: KMP
 
-### 3.1 The iOS Background Advertising Limitation
-Initially, the intuitive approach is to have the phone act as a BLE Peripheral (Broadcaster) continuously announcing its presence, and Guillemot acting as the Central (Scanner) to detect the phone. 
+Rather than duplicating business logic (Swift + Kotlin) or wrapping the C++ firmware codebase (`immo_crypto.cpp`) via JNI/Objective-C++, Pipit uses KMP.
 
-However, **iOS severely restricts background BLE advertising.** When an iOS app goes into the background, Apple strips out the Manufacturer Data and hashes the custom Service UUID into an undocumented, proprietary "overflow area." Since Guillemot runs on an nRF52840 MCU and not Apple silicon, it cannot easily decode this proprietary hash to recognize the iPhone.
+* Native Kotlin on Android; compiles to a Swift-friendly native framework on iOS.
+* Modern memory-safe environment vs. manual memory management through C++ wrappers.
+* **Trade-off:** The C++ AES-CCM (RFC3610) crypto and MAC logic must be ported to pure Kotlin. The KMP implementation will be exhaustively unit-tested against the existing C++ test vectors for bit-for-bit parity.
 
-### 3.2 The Flipped Solution: Guillemot as Advertiser
-To achieve 100% reliable background wake-ups on both iOS and Android, the architecture flips the traditional BLE roles:
+### 2.2 UI: Platform-Native (Compose & UIKit)
 
-1. **Guillemot acts as a Central AND a Peripheral:**
-   * It continues its 5% duty-cycle scanning (25ms window / 500ms interval) to listen for Uguisu fobs.
-   * *Simultaneously*, it broadcasts a slow, continuous advertisement beacon containing a specific "Immogen Proximity" Service UUID every **500ms**.
-2. **Pipit acts as the Central (Scanner):**
-   * The Pipit app registers a background scanner with the OS (via CoreBluetooth on iOS and `BluetoothLeScanner` with a Foreground Service on Android) specifically looking for the "Immogen Proximity" Service UUID.
-   * When the user walks within range, the phone's OS hardware detects the 500ms beacon and wakes the Pipit app in the background. **Note:** iOS background scan delivery is not instantaneous—CoreBluetooth may batch scan results and deliver them with a delay ranging from sub-second to several minutes, depending on iOS version, device state, and app usage recency. `CBCentralManagerScanOptionAllowDuplicatesKey` is also ignored in background mode. The implementation must use `centralManager:willRestoreState:` for state restoration to maximize reliability.
-   * Pipit connects to Guillemot, executes the challenge-response authentication, and unlocks the vehicle.
+No cross-platform UI frameworks (Flutter, React Native). BLE, camera (QR scanning), and secure enclave access are deeply intertwined with UI/UX — native toolkits ensure reliable platform API integration. UIKit is preferred over SwiftUI on iOS for mature BLE lifecycle management and finer control over background state transitions.
 
-### 3.3 Power Consumption Impact on Guillemot
-One concern with Guillemot advertising continuously is battery drain. However, the math proves this impact is negligible:
-* **Current Scan Draw:** ~306 µA (5% duty cycle listening for Uguisu).
-* **New Beacon Draw:** Advertising once every 500ms requires ~2ms of TX active time at ~5.3 mA, which averages to just **~21.2 µA**.
-* **Total New Power Draw:** ~327 µA.
-* **Battery Life Effect:** At 327 µA, a 15.3 Ah scooter battery will last roughly 5.3 years in standby mode, which is far beyond the natural self-discharge rate of lithium-ion cells (~12 months).
+---
 
-**Rationale:** Trading ~21 µA of power on Guillemot for 100% reliable iOS background wake-ups is an optimal architectural compromise.
+## 3. Key Slot Architecture
 
-### 3.4 End-to-End Unlock Latency (GATT Path)
-Unlike Uguisu's connectionless broadcast (which Guillemot detects in a single scan window), the Pipit unlock path involves multiple sequential BLE operations after the background wake-up:
+Guillemot supports **4 key slots** (0–3), each with an independent 16-byte PSK and monotonic counter for replay protection. Slot 0 is reserved for the Uguisu hardware fob; Slots 1–3 are for Pipit instances.
+
+This solves the counter desync problem: if Uguisu and Pipit shared a single key/counter, unlocking via one would advance Guillemot's counter, causing the other device's payloads to be rejected until it "catches up." Independent slots eliminate this entirely.
+
+When all slots are occupied, a new device cannot be provisioned until an existing slot is revoked.
+
+---
+
+## 4. BLE Architecture
+
+### 4.1 The iOS Background Advertising Problem
+
+The intuitive approach — phone as BLE Peripheral broadcasting its presence, Guillemot as Central scanning — fails on iOS. When backgrounded, iOS strips Manufacturer Data and hashes custom Service UUIDs into an undocumented, proprietary "overflow area." Guillemot (nRF52840) cannot decode this proprietary hash.
+
+### 4.2 Solution: Guillemot as Advertiser, Pipit as Scanner
+
+To achieve reliable background wake-ups on both platforms, the BLE roles are flipped:
+
+1. **Guillemot (Central + Peripheral):**
+   * Continues 5% duty-cycle scanning (25ms/500ms) for Uguisu fobs.
+   * Simultaneously broadcasts a 500ms-interval beacon with a custom "Immogen Proximity" Service UUID.
+2. **Pipit (Central/Scanner):**
+   * Registers a background scanner (CoreBluetooth on iOS, `BluetoothLeScanner` + Foreground Service on Android) filtering for the Immogen Proximity UUID.
+   * On detection, wakes in the background, connects via GATT, executes challenge-response authentication, and unlocks.
+
+**iOS caveats:** CoreBluetooth batches background scan delivery — latency ranges from sub-second to several minutes depending on iOS version, device state, and app recency. `CBCentralManagerScanOptionAllowDuplicatesKey` is ignored in background mode. Implementation must use `centralManager:willRestoreState:` for state restoration.
+
+### 4.3 Why GATT (Not Connectionless)
+
+Even with the roles flipped, Pipit cannot send its unlock payload connectionlessly — the BLE specification provides no mechanism for a scanner to transmit custom data (e.g., inside a Scan Request). Pipit must establish a GATT connection to write the payload.
+
+### 4.4 GATT Characteristic Structure
+
+Guillemot's GATT server exposes the "Immogen Proximity" service with three characteristics:
+
+* **Unlock Command:** Pipit writes an encrypted AES-CCM payload (identical format to Uguisu's MSD). Guillemot routes it through `verify_payload()`.
+* **Management Auth:** PIN challenge to establish an authenticated management session.
+* **Management Command:** Gated behind successful PIN auth — slot queries, revocation, provisioning, and PIN changes.
+
+### 4.5 Unlock Latency (GATT Path)
+
+Unlike Uguisu's connectionless broadcast (detected in a single scan window), Pipit's path involves sequential GATT operations post-wake:
 
 | Step | Typical Latency |
 |---|---|
-| iOS/Android background scan delivery | Sub-second to minutes (variable; see §3.2 note) |
+| OS background scan delivery | Sub-second to minutes (variable) |
 | GATT connection establishment | ~50–200 ms |
 | Service & characteristic discovery | ~100–300 ms |
 | Encrypted payload write + ACK | ~10–50 ms |
-| Guillemot `verify_payload()` + latch actuation | ~5–15 ms |
+| `verify_payload()` + latch actuation | ~5–15 ms |
 | **Total (post-wake)** | **~165–565 ms** |
 
-In practice, the post-wake GATT path will feel near-instant once the phone has been woken. The dominant latency variable is the OS background scan delivery itself. Users should expect that proximity unlock via Pipit will not feel as instantaneous as a physical Uguisu fob press, particularly on iOS where background scan batching can introduce noticeable delay.
+The post-wake GATT path is near-instant. The dominant variable is OS scan delivery — proximity unlock via Pipit will not feel as instantaneous as a physical fob press, particularly on iOS.
 
 ---
 
-## 4. Implementation Blueprint
+## 5. Provisioning & Key Management
 
-To realize this architecture, the implementation will be split into the following phases:
+### 5.1 QR Code Provisioning
 
-1. **KMP Project Scaffolding:** Create the Pipit monorepo structure containing `shared`, `androidApp`, and `iosApp`.
-2. **Crypto & Protocol Porting:** Implement pure-Kotlin versions of `immo_crypto.cpp` (AES-128 and RFC3610 MIC generation) inside the KMP `shared` module, validating against established test vectors.
-3. **Platform Interfaces (expect/actual):** Define KMP wrappers for secure storage (Keychain/Keystore) and BLE Central managers.
-4. **Guillemot Firmware Update:** Modify `Guillemot/firmware/src/main.cpp` and `guillemot_nrf52840.h` to emit the 500ms advertisement beacon.
-5. **Native UI & Hardware Integration:** Build the QR scanning provisioning flow and the foreground Key Fob interfaces using Jetpack Compose and SwiftUI.
-6. **Background Services:** Implement Android Foreground Services and iOS CoreBluetooth background modes to handle the proximity wake-up and automated authentication sequence.
+Pipit is provisioned by scanning a QR code displayed by **Whimbrel** (initial setup) or **another Pipit instance** (post-installation). The QR encodes:
+
+```
+immogen://prov?slot=<n>&key=<hex>&ctr=0&pin=<6digits>
+```
+
+* QR codes provide a high-bandwidth, air-gapped transfer of root cryptographic keys — no pairing over an unencrypted BLE channel.
+* Slot keys and management PIN are stored strictly in hardware-backed keystores (**Android Keystore** / **iOS Keychain**) — never in plaintext storage.
+* The KMP shared module parses the provisioning URI. Both Whimbrel and Pipit can generate and display QR codes.
+
+### 5.2 Onboarding Flow (Whimbrel)
+
+The initial provisioning is driven by Whimbrel over USB-C serial:
+
+1. Flash Guillemot firmware via USB-C DFU. *(Skippable for pre-flashed devices.)*
+2. Provision Uguisu (Slot 0): Generate key → flash to fob via serial → prompt disconnect.
+3. Provision Guillemot (Slot 0): Flash same key via serial. No management PIN set yet.
+4. "Add a phone key?" — if declined, onboarding complete.
+5. Set management PIN: User enters 6-digit PIN. Whimbrel sends PIN hash and provisions Slot 1 via serial.
+6. Display QR code for the phone to scan (with obscure/reveal controls).
+
+### 5.3 BLE Key Management (Post-Installation)
+
+Once a management PIN is set, Pipit can authenticate to Guillemot over BLE and perform:
+
+* **Query slot status:** Read all 4 slots — occupied/empty, last-seen counter values.
+* **Revoke a slot:** Zero PSK and reset counter, freeing it for re-provisioning.
+* **Provision new phone (Slots 1–3):** Generate key → write to empty slot on Guillemot → display QR for target phone.
+* **Provision/replace Uguisu fob (Slot 0):** Generate key → write to Slot 0 over BLE → flash to fob via USB-C. **Android only** (USB OTG via `usb-serial-for-android`); iOS requires Whimbrel on a laptop.
+* **Change management PIN:** Requires current PIN.
+
+### 5.4 Management PIN
+
+A **6-digit management PIN** enables BLE key management post-installation, avoiding vehicle teardown for routine operations. The PIN is only set when the first phone is provisioned — until then, Guillemot does not expose BLE management characteristics.
+
+**Brute-force protection (Guillemot-enforced):**
+* Exponential backoff after 3 consecutive failures: 5s → 10s → 20s → 40s → ...
+* Hard lockout after 10 consecutive failures — BLE management disabled entirely. Recovery requires USB-C serial via Whimbrel.
+* Successful PIN entry resets the failure counter.
+
+Pipit must handle lockout feedback gracefully in its UI (display remaining wait time, indicate hard lockout state).
+
+### 5.5 Recovery Fallback
+
+USB-C serial via Whimbrel is the break-glass path for: all keys lost, PIN forgotten, or hard lockout triggered. Requires physical access to Guillemot's USB-C port (vehicle disassembly) — acceptable for a recovery-only path. Pipit should direct users to Whimbrel in these scenarios.
+
+---
+
+## 6. Platform Capability Matrix
+
+Capabilities differ due to iOS's lack of USB device APIs. BLE DFU has been evaluated and rejected — all firmware flashing uses USB-C (UF2 mass storage for Guillemot, CDC serial for Uguisu).
+
+| Operation | Pipit (Android) | Pipit (iOS) | Whimbrel (laptop) |
+|---|---|---|---|
+| **Guillemot firmware flash** | USB OTG — `.uf2` via `libaums` | Not supported | USB-C DFU |
+| **Uguisu firmware/key flash** | USB OTG — CDC serial via `usb-serial-for-android` | Not supported | Web Serial |
+| **Key management (BLE)** | BLE GATT + PIN | BLE GATT + PIN | Web Bluetooth + PIN |
+| **Phone provisioning** | BLE + QR display | BLE + QR display | Web Bluetooth + QR display |
+| **Proximity unlock** | BLE background scan (Foreground Service) | BLE background scan (CoreBluetooth) | N/A |
+| **Active key fob** | BLE GATT write | BLE GATT write | N/A |
+
+### 6.1 Android USB Details
+
+**Guillemot DFU (UF2):** The Xiao nRF52840 Adafruit bootloader presents as USB mass storage in DFU mode (double-tap reset). Pipit uses `libaums` (pure Java, no root) to mount the FAT filesystem and copy the `.uf2`. Must handle USB re-enumeration (CDC serial → mass storage) via `ACTION_USB_DEVICE_ATTACHED/DETACHED` receivers.
+
+**Uguisu serial:** `usb-serial-for-android` opens CDC/ACM connections. Auto-detection by interface type supported since v3.5.0 (no VID/PID probing).
+
+**Gotchas:** Android requires explicit USB permission per device (`UsbManager.requestPermission()`). Phone must supply 5V via USB-C OTG — most 2020+ devices support this; low-end devices may not.
+
+### 6.2 iOS Limitations (Confirmed)
+
+No public API for generic USB device communication. Investigated and ruled out:
+* `ExternalAccessory` — requires MFi certification.
+* DriverKit/USBDriverKit — iPadOS M1+ only.
+* WebUSB — unsupported in Safari.
+* USB CDC serial — no API.
+* UF2 via Files app — unreliable (iOS writes `.Trashes`/`.fseventsd` metadata that confuses the bootloader).
+
+**Consequence:** iOS users needing firmware flashing or Uguisu fob provisioning must use Whimbrel on a laptop. All BLE operations work identically on both platforms.
+
+---
+
+## 7. Implementation Phases
+
+1. **KMP Scaffolding:** Monorepo with `shared`, `androidApp`, `iosApp`.
+2. **Crypto Porting:** Pure-Kotlin AES-128 and RFC3610 MIC generation in `shared`, validated against C++ test vectors.
+3. **Platform Interfaces (`expect`/`actual`):** KMP wrappers for secure storage (Keychain/Keystore) and BLE Central managers.
+4. **Native UI:** QR scanning provisioning flow, key fob interface, and slot management screens (Compose / UIKit).
+5. **Background Services:** Android Foreground Service and iOS CoreBluetooth background modes for proximity wake-up and automated authentication.
