@@ -1,6 +1,6 @@
 # BLE Immobilizer System — Complete Technical Writeup
 
-**Last modified: 2026-03-09 06:13**
+*Date: 2026-03-09 06:13*
 
 **Ninebot G30 Immobilizer: Guillemot, Uguisu, ImmoCommon & Whimbrel**
 

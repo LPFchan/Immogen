@@ -1,6 +1,6 @@
 # Immogen Monorepo Migration Guide
 
-**Last modified: 2026-03-09 23:28**
+*Date: 2026-03-09 23:28*
 
 This guide describes how to merge Guillemot and Uguisu into the ImmoCommon repository, rename it to **Immogen**, and reconfigure releases. **Full git history is preserved** for all projects.
 

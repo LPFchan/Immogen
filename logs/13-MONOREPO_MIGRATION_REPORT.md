@@ -1,6 +1,6 @@
 # Monorepo Migration Report — Immogen
 
-**Last modified: 2026-03-10 00:04**
+*Date: 2026-03-10 00:04*
 
 This document summarizes how the ImmoCommon → Immogen monorepo migration was executed in practice, based on the [12-MONOREPO_MIGRATION_GUIDE.md](12-MONOREPO_MIGRATION_GUIDE.md) and the actual session.
 

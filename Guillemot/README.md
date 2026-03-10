@@ -31,7 +31,8 @@ Mount Guillemot on the plastic underside of the deck for good 2.4 GHz RF.
 | C1        | 10 nF (0603)    | POR pulse differentiator                                          | C57112           | $0.003 |
 | C2        | 100 µF (1210)   | Bulk decoupling. EMK325ABJ107MM-P 16V X5R ±20%                   | C90143 (ext.)    | $0.31  |
 | C3, C4    | 1 µF (0603)     | RC delay bypass, gate isolation                                   | C15849           | $0.01  |
-| R1–R3, R7 | 100 kΩ (0603)   | Gate drive, pull-ups, RC delay (τ = 100 ms)                       | C25803           | $0.006 |
+| R1, R2    | 100 kΩ (0603)   | Latch input pull-downs (prevent floating during WDT reset)        | C25803           | $0.006 |
+| R3, R7    | 100 kΩ (0603)   | Gate drive, RC delay (τ = 100 ms)                                 | C25803           | $0.006 |
 | R4        | 1 MΩ (0603)     | P-FET gate pull-up                                                | C22935           | $0.001 |
 | R5        | 10 kΩ (0603)    | Bleeder resistor                                                  | C25804           | $0.001 |
 | R6        | 4.7 kΩ (0603)   | Piezo buzzer discharge resistor                                   | C23162           | $0.001 |
@@ -63,6 +64,7 @@ JLCPCB P&P for SMT. Hand-solder XIAO edges, XT60 pigtails, and the GND jumper.
 ### Design Notes
 
 - **EasyEDA → KiCad:** Schematics and PCBs are designed in KiCad. [easyeda2kicad](https://github.com/wokwi/easyeda2kicad) is used to import symbols and footprints from EasyEDA/LCSC. Example: `easyeda2kicad --full --lcsc_id=Cxxxx` (replace `Cxxxx` with the LCSC part number).
+- **Latch Input Pull-downs (100 kΩ):** R1 and R2 hold `MCU_D0` (SET) and `MCU_D1` (RESET) strictly LOW. This is critical because the nRF52840's pins float (high-impedance) during the 8-second hardware Watchdog Timer (WDT) reset cycle. Without these resistors, noise or capacitive coupling could randomly toggle the latch and power state while the MCU reboots.
 - **AO3422:** 55 V Vds provides margin over the 42 V bus when locked.
 - **Gate drive R (100 kΩ):** Protects the 2N7002 and BZT Zeners.
 - **POR circuit (10 nF + 100 kΩ):** 1 ms RC differentiator—brief pulse zeros the latch at power-on.

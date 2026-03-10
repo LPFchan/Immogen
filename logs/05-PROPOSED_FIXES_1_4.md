@@ -1,6 +1,6 @@
 # Proposed Fixes 1–4: Revised Implementations
 
-**Last modified: 2026-03-09 06:35**
+*Date: 2026-03-09 06:35*
 
 *Fixes derived from CODEBASE_REVIEW_FINDINGS.md, rewritten against actual source.*
 

@@ -1,8 +1,7 @@
 # BLE Scanning Power Consumption Analysis & Documentation Discrepancy
 
-**Last modified: 2026-03-10 00:57**
+*Date: 2026-03-10 00:57*
 
-**Date:** March 2026
 **Status:** Technical Analysis & Recommendations
 **Scope:** Guillemot receiver power profile, detection reliability, and firmware configuration documentation
 

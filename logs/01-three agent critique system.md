@@ -1,10 +1,10 @@
-**Last modified: 2026-03-09 06:06**
+*Date: 2026-03-09 06:06*
 
 Agent A: architecture summary
 can you look at the codebase of (repo) and make a human-readable markdown document documenting each and every part, down to every modules, every sections and every function into a concise technical writeup and save it as a markdown document in the logs folder?
 
 Agent B: critic
-(summary doc) outlines (project description). from the top down, do you think this big picture architecture is efficient and make sense? does each module and each function is written in a way that's efficient? scrutnise it thoroughly
+(summary doc) outlines (project description). from the top down, do you think this big picture architecture is efficient and make sense? does each module and each function is written in a way that's efficient? how would you restructure things in the big picture? if you were the one to build this project from the ground up, what would you do differently? scrutnise every little detail thoroughly
 turn this response into a concise technical writeup in markdown format. omit all things that are executed well and don't need attention. save it as a markdown document in the logs folder.
 
 Agent C: critique response

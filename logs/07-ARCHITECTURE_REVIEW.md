@@ -1,6 +1,6 @@
 # BLE Immobilizer — Architecture Review Findings
 
-**Last modified: 2026-03-09 14:43**
+*Date: 2026-03-09 14:43*
 
 Issues identified during full codebase review, ranked by severity.
 

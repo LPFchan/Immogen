@@ -1,6 +1,6 @@
 # Immogen Codebase Technical Documentation
 
-*Last modified: 2026-03-10*
+*Date: 2026-03-10 08:38*
 
 Immogen is a three-part BLE immobilizer system for the Ninebot Max G30 electric scooter. It consists of **Uguisu** (key fob), **Guillemot** (deck receiver), and a shared cryptographic library. A companion web app, **Whimbrel** (separate repo), handles key provisioning via Web Serial.
 
