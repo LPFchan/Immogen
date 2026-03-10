@@ -58,8 +58,9 @@ To achieve reliable background wake-ups on both platforms, the BLE roles are fli
    * Continues 5% duty-cycle scanning (25ms/500ms) for Uguisu fobs.
    * Simultaneously broadcasts a 500ms-interval beacon with a custom "Immogen Proximity" Service UUID.
 2. **Pipit (Central/Scanner):**
-   * Registers a background scanner (CoreBluetooth on iOS, `BluetoothLeScanner` + Foreground Service on Android) filtering for the Immogen Proximity UUID.
-   * On detection, wakes in the background, connects via GATT, executes challenge-response authentication, and unlocks.
+   * Implements a **Stateful Beaconing** strategy to support both approach-to-unlock and walk-away-to-lock without continuous background wake-ups while riding.
+   * **When Locked:** Scans for the "Immogen Proximity - Locked" UUID. On detection, it evaluates the beacon's RSSI against a user-configurable proximity threshold. If the signal is strong enough, it connects via GATT and sends the Unlock payload.
+   * **When Unlocked:** Scans for the "Immogen Proximity - Unlocked" UUID. Monitors RSSI against the user's walk-away threshold. When RSSI drops below this threshold (or the beacon is lost entirely), it connects via GATT and sends the Lock payload.
 
 **iOS caveats:** CoreBluetooth batches background scan delivery — latency ranges from sub-second to several minutes depending on iOS version, device state, and app recency. `CBCentralManagerScanOptionAllowDuplicatesKey` is ignored in background mode. Implementation must use `centralManager:willRestoreState:` for state restoration.
 
@@ -71,11 +72,20 @@ Even with the roles flipped, Pipit cannot send its unlock payload connectionless
 
 Guillemot's GATT server exposes the "Immogen Proximity" service with three characteristics:
 
-* **Unlock Command:** Pipit writes an encrypted AES-CCM payload (identical format to Uguisu's MSD). Guillemot routes it through `verify_payload()`.
-* **Management Auth:** PIN challenge to establish an authenticated management session.
-* **Management Command:** Gated behind successful PIN auth — slot queries, revocation, provisioning, and PIN changes.
+* **Unlock/Lock Command:** Pipit writes a 19-byte encrypted AES-CCM payload (identical structure to Uguisu's MSD). This is a "Write Without Response" (fire-and-forget), matching the blind-broadcast nature of the hardware fob.
+* **Management Command:** Requires an **Authenticated Link** (MITM protection) via standard BLE Pairing PIN. Used for slot queries, revocation, provisioning, and PIN changes.
+* **Management Response:** `Notify` characteristic to asynchronously return responses to management commands. Responses (like the output of `SLOTS?`) are formatted as JSON for trivial parsing in KMP and Web Bluetooth (e.g., `{"slots":[{"id":0,"used":true},{"id":1,"used":false}]}`).
 
-### 4.5 Unlock Latency (GATT Path)
+### 4.5 Slot Identification via Prefix Byte
+
+The 19-byte payload structure is: `[1-byte Prefix] [4-byte Counter] [10-byte MAC] [4-byte Ciphertext]`.
+To avoid brute-forcing decryption across all 4 key slots, the 1-byte Prefix explicitly encodes both the Slot ID and the Command:
+* **Upper 4 bits:** Slot ID (0-3)
+* **Lower 4 bits:** Command (1 = Unlock, 2 = Lock)
+
+Example: `0x11` explicitly tells Guillemot to pull the AES key for Slot 1 and verify an Unlock command. Slot 0 is strictly reserved for the Uguisu fob.
+
+### 4.6 Unlock Latency (GATT Path)
 
 Unlike Uguisu's connectionless broadcast (detected in a single scan window), Pipit's path involves sequential GATT operations post-wake:
 
@@ -127,9 +137,15 @@ Once a management PIN is set, Pipit can authenticate to Guillemot over BLE and p
 * **Provision/replace Uguisu fob (Slot 0):** Generate key → write to Slot 0 over BLE → flash to fob via USB-C. **Android only** (USB OTG via `usb-serial-for-android`); iOS requires Whimbrel on a laptop.
 * **Change management PIN:** Requires current PIN.
 
-### 5.4 Management PIN
+### 5.4 Management PIN (For Stateless Whimbrel Access)
 
-A **6-digit management PIN** enables BLE key management post-installation, avoiding vehicle teardown for routine operations. The PIN is only set when the first phone is provisioned — until then, Guillemot does not expose BLE management characteristics.
+A **6-digit management PIN** enables BLE key management post-installation, avoiding vehicle teardown for routine operations. 
+
+**Why a PIN?** It allows the Whimbrel web dashboard to manage keys over BLE without requiring Whimbrel to store or maintain permanent memory of the vehicle's cryptographically secure 16-byte slot keys. A user can connect via any browser supporting Web Bluetooth, enter the PIN, and perform emergency operations (like revoking a lost phone) completely statelessly.
+
+**Security via BLE Pairing PIN:** Instead of a custom plaintext PIN challenge (which would expose new provisioning keys to passive BLE sniffers), the PIN acts as the **standard BLE Pairing PIN (SMP)**. When Whimbrel or Pipit attempts to read/write the Management characteristics, the OS automatically prompts for the 6-digit PIN, establishing a fully encrypted and MITM-protected BLE session before any commands are transmitted.
+
+The PIN is only set when the first phone is provisioned — until then, Guillemot does not expose BLE management characteristics.
 
 **Brute-force protection (Guillemot-enforced):**
 * Exponential backoff after 3 consecutive failures: 5s → 10s → 20s → 40s → ...

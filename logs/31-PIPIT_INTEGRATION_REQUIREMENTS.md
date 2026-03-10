@@ -34,20 +34,28 @@ To achieve reliable background wake-ups on both iOS and Android, the BLE roles a
 
 1. **Guillemot (Central + Peripheral):**
    * Continues 5% duty-cycle scanning (25ms/500ms) for Uguisu fobs.
-   * Simultaneously broadcasts a 500ms-interval beacon with a custom "Immogen Proximity" Service UUID.
+   * Implements **Stateful Beaconing**: Broadcasts a 500ms-interval beacon containing the "Immogen Proximity - Locked" Service UUID when locked, and switches to the "Immogen Proximity - Unlocked" Service UUID when unlocked.
 2. **Pipit (Central/Scanner):**
-   * Registers a background scanner filtering for the Immogen Proximity UUID.
-   * On detection, wakes in background, connects via GATT, and writes the unlock payload.
+   * Registers background scanners filtering for these specific UUIDs based on the desired target state.
+   * **To Unlock (Approach):** Scans for the "Locked" UUID. On detection, evaluates the RSSI against the user's proximity threshold. If the signal meets the threshold, wakes in background, connects via GATT, and writes the Unlock payload.
+   * **To Lock (Walk-Away):** Scans/monitors the "Unlocked" UUID. Evaluates RSSI against the user's walk-away threshold. When RSSI falls below the threshold or the beacon is lost, wakes in background, connects via GATT, and writes the Lock payload.
 
 ### 2.2 GATT Characteristic Structure
 
 The "Immogen Proximity" service exposes three characteristics:
 
-* **Unlock Command:** Receives encrypted AES-CCM payloads, routed through `verify_payload()`.
-* **Management Auth:** Accepts a PIN challenge to establish an authenticated management session.
-* **Management Command:** Gated behind successful PIN auth — slot queries, revocation, provisioning, and PIN changes.
+* **Unlock/Lock Command:** Receives a 19-byte encrypted AES-CCM payload (identical structure to Uguisu's MSD) as a "Write Without Response" (fire-and-forget). Routed through `verify_payload()`.
+* **Management Command:** Requires an **Authenticated Link** (MITM protection) via standard BLE Pairing PIN. Used to receive management commands (slot queries, revocation, provisioning, and PIN changes).
+* **Management Response:** `Notify` characteristic to asynchronously return responses to management commands. Output for data queries (e.g., `SLOTS?`) is formatted as JSON.
 
-### 2.3 Power Budget
+### 2.3 Slot Identification via Prefix Byte
+
+The 19-byte command payload explicitly encodes its target Key Slot in the first byte to prevent Guillemot from brute-forcing AES decryption across all slots.
+* **1-Byte Prefix Structure:** `(Slot ID << 4) | (Command)`
+* **Upper 4 bits:** Target Key Slot (0-3). Slot 0 is strictly reserved for Uguisu.
+* **Lower 4 bits:** Command ID (1 = Unlock, 2 = Lock).
+
+### 2.4 Power Budget
 
 | Metric | Value |
 |---|---|
@@ -91,9 +99,15 @@ URI format: `immogen://prov?slot=<n>&key=<hex>&ctr=0&pin=<6digits>`, parseable b
 
 ## 4. Management PIN & Security
 
-### 4.1 PIN Lifecycle
+### 4.1 PIN Lifecycle (For Stateless Whimbrel Access)
 
-A **6-digit management PIN** enables BLE key management post-installation, avoiding vehicle teardown for routine operations. The PIN is only set when the first phone is provisioned — until then, BLE management characteristics are not exposed. Stored as a hash in non-volatile flash.
+A **6-digit management PIN** enables BLE key management post-installation, avoiding vehicle teardown for routine operations. 
+
+**Why a PIN?** It allows the Whimbrel web dashboard to manage keys over BLE without requiring Whimbrel to store or maintain permanent memory of the vehicle's cryptographically secure 16-byte slot keys. A user can connect via any browser supporting Web Bluetooth, enter the PIN, and perform operations (like revoking a lost phone) statelessly.
+
+**Security via BLE Pairing PIN:** The PIN is not sent as a plaintext payload or custom challenge. It acts as the **standard BLE Pairing PIN (SMP)**. When a client attempts to read/write the Management characteristics, the OS automatically prompts for the 6-digit PIN. This establishes a standard, fully encrypted and MITM-protected BLE connection, ensuring that sensitive management payloads (like new provisioning root keys) are never exposed to passive BLE sniffers.
+
+The PIN is only set when the first phone is provisioned — until then, BLE management characteristics are not exposed. Stored as a hash in non-volatile flash.
 
 ### 4.2 Brute-Force Rate Limiting
 
@@ -110,8 +124,8 @@ USB-C serial via Whimbrel is the break-glass path for: all keys lost, PIN forgot
 ## 5. Required Changes: Guillemot Firmware
 
 1. **Dual BLE roles:** `Bluefruit.begin(0, 1)` → `Bluefruit.begin(1, 1)` — Central (Uguisu scanning) + Peripheral (Pipit beacon) simultaneously.
-2. **Proximity beacon:** 500ms advertising interval (`Bluefruit.Advertising.setInterval(800, 800)`) with the "Immogen Proximity" Service UUID.
-3. **GATT server:** Implement the three-characteristic service described in §2.2, with write callbacks to handle Pipit connections and incoming payloads.
+2. **Stateful Proximity beacon:** 500ms advertising interval (`Bluefruit.Advertising.setInterval(800, 800)`). Dynamically updates the advertised Service UUID based on the latch state ("Immogen Proximity - Locked" vs "Immogen Proximity - Unlocked") to enable Pipit's walk-away auto-locking without continuous background wake-ups while riding.
+3. **GATT server:** Implement the three-characteristic service described in §2.2, with write callbacks to handle Pipit connections and incoming payloads. Configure SoftDevice to enforce **Authenticated Link** security on the Management characteristics.
 4. **Multi-slot storage:** Refactor `immo::CounterStore` and `immo_provisioning` for 4 independent key slots.
 5. **PIN storage & rate limiting:** Hash in non-volatile flash; exponential backoff + hard lockout per §4.2.
 
