@@ -9,7 +9,9 @@
 
 ## 1. Overview & Tech Stack
 
-**Pipit** is the companion app for the Immogen immobilizer ecosystem. It provides:
+**Pipit** is the companion app for the Immogen immobilizer ecosystem. *(Note on Terminology: Throughout this document, the target Ninebot G30 or any future compatible PEV is referred to universally as the **vehicle**, not "scooter").* 
+
+It provides:
 1. **Proximity Unlock (Background):** Low-power background BLE service that detects the vehicle and automatically unlocks Guillemot based on RSSI thresholding.
 2. **Active Key Fob (Foreground):** Manual lock/unlock UI, functionally identical to the Uguisu hardware fob.
 
@@ -43,7 +45,7 @@ Because iOS background advertising is broken (CoreBluetooth strips Manufacturer 
 * **Guillemot (Advertiser):** Broadcasts a continuous beacon as a connectable GATT peripheral. The advertising interval dynamically shifts based on the latch state (see Section 3.2).
 * **Pipit (Scanner):** Registers a background scanner filtering for the Immogen Proximity UUID.
 
-**iOS Background Optimization:** CoreBluetooth background scanning is throttled to ~3–4 minute intervals, which is unacceptable for proximity unlock. To mitigate this, Guillemot simultaneously broadcasts an **iBeacon** advertisement using a dedicated Immogen Proximity UUID (`66962B67-9C59-4D83-9101-AC0C9CCA2B12`). iOS CoreLocation monitors this beacon region via a hardware-level path, waking Pipit within ~1–2 seconds of approach. The nRF52840's extended advertising support allows both iBeacon and GATT advertisements to broadcast concurrently without alternation.
+**iOS Background Optimization:** CoreBluetooth background scanning is throttled to ~3–4 minute intervals, which is unacceptable for proximity unlock. To mitigate this, Guillemot simultaneously broadcasts an **iBeacon** advertisement using a dedicated Immogen Proximity UUID (`66962B67-9C59-4D83-9101-AC0C9CCA2B12`). The iBeacon broadcasts at a **fixed 300 ms interval**, independent of the latch state. This interval aligns perfectly with Apple's CoreLocation specifications, reliably waking Pipit via a hardware-level path within ~1–2 seconds of approach. The nRF52840's extended advertising support allows both iBeacon and GATT advertisements to broadcast concurrently without alternation.
 
 *   **iOS flow:** CoreLocation detects iBeacon region entry → wakes Pipit → Pipit initiates CoreBluetooth GATT connection → evaluates RSSI → sends payload.
 *   **Android flow:** Foreground Service scans directly for the GATT advertisement (no iBeacon needed; Android background scanning is unrestricted).
@@ -51,14 +53,14 @@ Because iOS background advertising is broken (CoreBluetooth strips Manufacturer 
 **iOS Permission Requirement:** iBeacon region monitoring requires **"Always Allow" location permission**. Pipit must request this during onboarding. Users who decline are degraded to the slow CoreBluetooth background scanning path (~3–4 minute intervals). This trade-off should be communicated clearly in the permission prompt.
 
 ### 3.2 Stateful Proximity Beaconing & Dynamic Intervals
-To support both "approach-to-unlock" and highly-responsive "walk-away-to-lock" without causing severe battery drain on the phone while riding, Guillemot dynamically changes both its advertised Service UUID and its **advertising interval** based on the latch state:
+To support both "approach-to-unlock" and highly-responsive "walk-away-to-lock" without causing severe battery drain on the phone while riding, Guillemot dynamically changes both its advertised Service UUID and its **GATT advertising interval** based on the latch state:
 
 | State Beacon | UUID | Interval | Purpose |
 |---|---|---|---|
-| **Immogen Proximity - Locked** | `C5380EF2-C3FC-4F2A-B3CC-D51A08EF5FA9` | **500 ms** | Conserves battery while parked. Slower discovery is acceptable during approach. |
+| **Immogen Proximity - Locked** | `C5380EF2-C3FC-4F2A-B3CC-D51A08EF5FA9` | **300 ms** | Balances battery conservation while parked with relatively fast discovery during approach. |
 | **Immogen Proximity - Unlocked** | `A1AA4F79-B490-44D2-A7E1-8A03422243A1` | **200 ms** | Provides high-fidelity, high-frequency RSSI data to the phone to accurately detect walk-aways. |
 
-*   **Approach (When Locked):** Guillemot advertises the Locked UUID at 500 ms. Pipit lazily scans for this UUID. When detected, Pipit evaluates the RSSI against the unlock proximity threshold. If strong enough, it connects via GATT and sends the Unlock payload.
+*   **Approach (When Locked):** Guillemot advertises the Locked UUID at 300 ms. Pipit lazily scans for this UUID. When detected, Pipit evaluates the RSSI against the unlock proximity threshold. If strong enough, it connects via GATT and sends the Unlock payload.
 *   **Walk-Away (When Unlocked):** Guillemot switches to the Unlocked UUID at 200 ms. Pipit monitors the Unlocked UUID, maintaining a rolling history of the high-frequency RSSI readings. 
     * **Normal Walk-Away:** When the RSSI drops below the lock proximity threshold (-75 dBm), Pipit connects and sends the Lock payload.
     * **Abrupt Dropout Edge Case:** If the beacon drops entirely *before* reaching the threshold (e.g., walking behind a concrete wall), Pipit analyzes the recent RSSI history. If the trend was decreasing, Pipit infers a walk-away and enters an aggressive scanning state, firing the Lock payload the instant the beacon is visible again. If the trend was stable (e.g., phone reboots mid-ride), it assumes a sudden failure and safely ignores the drop.
@@ -116,9 +118,10 @@ The PIN is not sent as a custom plaintext payload. It acts as the **standard BLE
 
 *Because the SoftDevice requires the plaintext PIN to execute the SMP mathematical handshake, the `SETPIN` command transmits and stores the 6 digits in plaintext.*
 
-### 5.3 Brute-Force Rate Limiting
+### 5.3 Brute-Force Rate Limiting & DoS Mitigation
 * Exponential backoff after 3 consecutive failures (5s → 10s → 20s → 40s → ...).
-* Hard lockout after 10 consecutive failures (BLE management disabled entirely). Recovery requires USB-C serial via Whimbrel (`RESETLOCK` command, serial-only).
+* **Temporary Lockout:** After 10 consecutive failures, BLE management characteristics are disabled entirely for **1 hour**.
+* **Anti-DoS Reset Bypass:** Receiving *any* valid, successfully authenticated AES-CCM Lock or Unlock payload (via the Write Without Response characteristic) proves physical key ownership and **instantly resets the PIN failure counter to zero**, clearing the lockout. This ensures a malicious actor cannot permanently deny the owner BLE management access by spamming bad PINs.
 
 ### 5.4 Counter Security Model
 Each key slot maintains an independent strictly-monotonic counter. Guillemot rejects any payload where `counter <= last_seen_counter` for that slot. There is no tolerance window — this is by design. A single replayed or out-of-order payload is always rejected. This strict model is the core of the anti-replay security and eliminates the complexity of window-based counter acceptance.
@@ -138,7 +141,7 @@ The `IDENTIFY` payload uses the same counter as lock/unlock (incrementing the sl
 
 **Permission matrix (enforced in Guillemot's parser after `IDENTIFY`):**
 
-| Command | Slot 1 (Owner) | Slot 2–3 (Guest) | No IDENTIFY |
+| Command | Slot 1 (Owner) | Slot 2–3 (Guest) | No IDENTIFY (e.g. Lost Phone) |
 |---|---|---|---|
 | `IDENTIFY` | ✓ | ✓ | N/A |
 | `SLOTS?` | ✓ | ✓ | ✓ (read-only fallback) |
@@ -146,8 +149,11 @@ The `IDENTIFY` payload uses the same counter as lock/unlock (incrementing the sl
 | `REVOKE:<any>` | ✓ | ✗ | ✗ |
 | `RENAME:<own slot>` | ✓ | ✗ | ✗ |
 | `RENAME:<other slot>` | ✓ | ✗ | ✗ |
+| `RECOVER:<slot>` | ✗ | ✗ | ✓ *(Only if vehicle is UNLOCKED)* |
 | `SETPIN` | serial-only | serial-only | serial-only |
 | `RESETLOCK` | serial-only | serial-only | serial-only |
+
+*(Note: The `RECOVER` command allows an unidentified phone to replace a key, but Guillemot strictly enforces that the vehicle's hardware latch must be HIGH/Unlocked for it to succeed. See Section 7.3).*
 
 **Guest access in practice:** Guest phones (Slot 2–3) provision via **unencrypted QR codes** (Section 7.1.1) and never learn the management PIN. They interact exclusively with the Unlock/Lock Command characteristic (Write Without Response, no SMP required). Guests have zero management write access, even to their own slot names.
 
@@ -167,10 +173,11 @@ Commands are accepted over two transports with different permission levels:
 | `RENAME:<slot>:<name>` | Yes | Yes | Owner only |
 | `SLOTS?` | Yes | Yes | Any (incl. unidentified) |
 | `REVOKE:<slot>` | Yes | Yes | Owner only |
+| `RECOVER:<slot>:<key>:<ctr>:[name]` | Yes | Yes | Unidentified (requires Unlocked vehicle) |
 | `SETPIN:<6digits>` | Yes | **No** (serial-only) | N/A |
 | `RESETLOCK` | Yes | **No** (serial-only) | N/A |
 
-`IDENTIFY` is sent as a 14-byte AES-CCM payload (same format as lock/unlock, command byte `0x02`) through the Management Command characteristic. It binds the BLE session to a slot and access tier (see Section 5.5). Must be sent before any write commands; only `SLOTS?` is allowed without identification.
+`IDENTIFY` is sent as a 14-byte AES-CCM payload (same format as lock/unlock, command byte `0x02`) through the Management Command characteristic. It binds the BLE session to a slot and access tier (see Section 5.5). Must be sent before any standard write commands; only `SLOTS?` and `RECOVER` are allowed without identification.
 
 `SETPIN` and `RESETLOCK` are restricted to USB-C serial because they are recovery/bootstrap operations. Exposing `RESETLOCK` over BLE would allow an attacker to clear brute-force lockout and keep attacking the PIN. `SETPIN` is serial-only to prevent remote PIN changes by a compromised phone.
 
@@ -348,7 +355,7 @@ Triggered when no AES key exists in the platform secure keystore. The camera ope
 ```
 *   The app launches directly into a **full-screen camera view** with a **darkened overlay** (semi-transparent black, ~70% opacity) covering the entire screen. A **rounded-rectangle transparent window** (QR-sized, centered) cuts through the overlay to form the viewfinder.
 *   The instruction text *"Scan from Whimbrel"* sits inside the darkened overlay below the viewfinder.
-*   **"recover key from lost phone >"** — a subtle text link at the bottom of the screen. Tapping it launches the Self-Provisioning Variant of the Replace Flow (Section 10.7), which connects directly to Guillemot via BLE management.
+*   **"recover key from lost phone >"** — a subtle text link at the bottom of the screen. Tapping it launches the Self-Provisioning Recovery Variant of the Replace Flow (Section 10.7).
 *   Non-Immogen QR codes (anything not starting with `immogen://prov?`) are **silently ignored** — the viewfinder simply continues scanning. No error toast or inline message.
 *   On valid scan → Pipit inspects the QR payload format:
     *   **Encrypted QR** (has `salt` + `ekey` fields — owner/migration): Proceeds to Step 2 (PIN Entry).
@@ -393,13 +400,13 @@ The animation is purely decorative — the actual Argon2id KDF + AES-CCM decrypt
 │   Enable proximity unlock?  │
 │                             │
 │   Pipit can automatically   │
-│   unlock your scooter when  │
+│   unlock your vehicle when  │
 │   you walk up to it.        │
 │                             │
 │   This requires "Always     │
 │   Allow" location access    │
 │   so the app can detect     │
-│   your scooter in the       │
+│   your vehicle in the       │
 │   background.               │
 │                             │
 │   Your location is never    │
@@ -509,7 +516,7 @@ The Uguisu 3D model remains faintly visible beneath the overlay but is **non-int
 ```
 
 **States:**
-*   `○ Disconnected` — Default when beacon is not detected. Shown as a centered label with a gray dot. No pulsing, no animation — the user can see at a glance that the scooter is out of range.
+*   `○ Disconnected` — Default when beacon is not detected. Shown as a centered label with a gray dot. No pulsing, no animation — the user can see at a glance that the vehicle is out of range.
 *   `✕ Bluetooth is off` — Shown when BLE is disabled system-wide. Tapping the label deep-links to the OS Bluetooth settings.
 
 The overlay **fades out** (200 ms) as soon as the Guillemot beacon is detected and a GATT connection is established. The gear icon remains accessible above the overlay so the user can always reach Settings regardless of connection state.
@@ -717,7 +724,7 @@ Pipit detects the current phone's slot tier at launch (from the stored slot ID) 
         *   **Android:** A **three-dot menu (⋮)** with:
             *   **Replace** — For swapping in a new physical Uguisu unit. This is an automated two-step flow:
                 1. Prompts the user to connect the new fob via USB-C OTG, and provisions the generated Slot 0 key into the new fob via CDC serial (`PROV:0:<new_key>:0:Uguisu`).
-                2. Pipit then automatically sends the same `PROV` command to Guillemot via the BLE Management Command characteristic to sync the scooter with the new fob. The old fob is immediately locked out.
+                2. Pipit then automatically sends the same `PROV` command to Guillemot via the BLE Management Command characteristic to sync the vehicle with the new fob. The old fob is immediately locked out.
             *   No Rename or Delete options. The hardware fob's name is always "Uguisu" and Slot 0 cannot be vacated.
 
     *   **Slot 1 (owner's own slot):** Shows the slot number and device name. **No three-dot menu** — the owner cannot replace or delete their own slot from here. Use "Transfer to New Phone" in the DEVICE section to migrate.
@@ -876,11 +883,13 @@ Pipit executes automatically:
 *   Same layout as Provision Flow Step 3. For guest replacements, the display notes *"No PIN required."* For owner replacement, it notes the recipient will need the PIN.
 *   **"Done"** returns to Settings. The slot row shows the default name.
 
-**Self-Provisioning Variant:** When the Replace flow is entered from the **Onboarding camera screen → "Phone recovery >"**, the current phone has no key and needs to provision *itself* rather than generating a QR for another device. In this case:
+**Self-Provisioning Recovery Variant:** When the Replace flow is entered from the **Onboarding camera screen → "Phone recovery >"**, the current phone has no key. The app displays an explicit blocker prompt before proceeding:
+*   *"Please unlock your vehicle with your Uguisu key fob or a guest phone key to authorize recovery."*
+Once the user confirms the vehicle is unlocked:
 1.  Pipit connects to Guillemot and authenticates via SMP PIN (OS prompt).
-2.  Pipit queries `SLOTS?` and displays the active phone slots for the user to choose which device to replace.
-3.  After revocation + provisioning, the new key is stored directly in the local secure keystore (no QR needed — the key is for this phone).
-4.  Pipit proceeds to the onboarding Done screen (Step 5).
+2.  Pipit queries `SLOTS?` and displays the active phone slots for the user to choose which device to recover.
+3.  Pipit automatically executes the `RECOVER:<slot>` command with a newly generated key (as per Section 7.3). 
+4.  The new key is stored directly in the local secure keystore (no QR needed — the key is for this phone) and Pipit proceeds to the onboarding Done screen (Step 5).
 
 ---
 
