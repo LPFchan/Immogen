@@ -40,7 +40,7 @@ The tier is implicit from the slot number — no additional flags or metadata ar
 
 ### 3.1 Flipped Roles & iBeacon Wake
 Because iOS background advertising is broken (CoreBluetooth strips Manufacturer Data and hashes Service UUIDs into a proprietary format), the BLE roles are flipped from the Uguisu model:
-* **Guillemot (Advertiser):** Broadcasts a continuous 500ms beacon as a connectable GATT peripheral.
+* **Guillemot (Advertiser):** Broadcasts a continuous beacon as a connectable GATT peripheral. The advertising interval dynamically shifts based on the latch state (see Section 3.2).
 * **Pipit (Scanner):** Registers a background scanner filtering for the Immogen Proximity UUID.
 
 **iOS Background Optimization:** CoreBluetooth background scanning is throttled to ~3–4 minute intervals, which is unacceptable for proximity unlock. To mitigate this, Guillemot simultaneously broadcasts an **iBeacon** advertisement using a dedicated Immogen Proximity UUID (`66962B67-9C59-4D83-9101-AC0C9CCA2B12`). iOS CoreLocation monitors this beacon region via a hardware-level path, waking Pipit within ~1–2 seconds of approach. The nRF52840's extended advertising support allows both iBeacon and GATT advertisements to broadcast concurrently without alternation.
@@ -50,16 +50,18 @@ Because iOS background advertising is broken (CoreBluetooth strips Manufacturer 
 
 **iOS Permission Requirement:** iBeacon region monitoring requires **"Always Allow" location permission**. Pipit must request this during onboarding. Users who decline are degraded to the slow CoreBluetooth background scanning path (~3–4 minute intervals). This trade-off should be communicated clearly in the permission prompt.
 
-### 3.2 Stateful Proximity Beaconing
-To support both "approach-to-unlock" and "walk-away-to-lock" without causing severe battery drain on the phone while riding, Guillemot dynamically changes its advertised Service UUID based on the latch state:
+### 3.2 Stateful Proximity Beaconing & Dynamic Intervals
+To support both "approach-to-unlock" and highly-responsive "walk-away-to-lock" without causing severe battery drain on the phone while riding, Guillemot dynamically changes both its advertised Service UUID and its **advertising interval** based on the latch state:
 
-| State Beacon | UUID |
-|---|---|
-| **Immogen Proximity - Locked** | `C5380EF2-C3FC-4F2A-B3CC-D51A08EF5FA9` |
-| **Immogen Proximity - Unlocked** | `A1AA4F79-B490-44D2-A7E1-8A03422243A1` |
+| State Beacon | UUID | Interval | Purpose |
+|---|---|---|---|
+| **Immogen Proximity - Locked** | `C5380EF2-C3FC-4F2A-B3CC-D51A08EF5FA9` | **500 ms** | Conserves battery while parked. Slower discovery is acceptable during approach. |
+| **Immogen Proximity - Unlocked** | `A1AA4F79-B490-44D2-A7E1-8A03422243A1` | **200 ms** | Provides high-fidelity, high-frequency RSSI data to the phone to accurately detect walk-aways. |
 
-*   **Approach (When Locked):** Guillemot advertises the Locked UUID. Pipit scans for this UUID. When detected, Pipit evaluates the RSSI against the unlock proximity threshold. If strong enough, it connects via GATT and sends the Unlock payload.
-*   **Walk-Away (When Unlocked):** Guillemot switches to the Unlocked UUID. Pipit stops scanning for the Locked UUID (preventing redundant wakeups) and monitors the Unlocked UUID. When the RSSI drops below the lock proximity threshold (or the beacon drops entirely), it connects and sends the Lock payload.
+*   **Approach (When Locked):** Guillemot advertises the Locked UUID at 500 ms. Pipit lazily scans for this UUID. When detected, Pipit evaluates the RSSI against the unlock proximity threshold. If strong enough, it connects via GATT and sends the Unlock payload.
+*   **Walk-Away (When Unlocked):** Guillemot switches to the Unlocked UUID at 200 ms. Pipit monitors the Unlocked UUID, maintaining a rolling history of the high-frequency RSSI readings. 
+    * **Normal Walk-Away:** When the RSSI drops below the lock proximity threshold (-75 dBm), Pipit connects and sends the Lock payload.
+    * **Abrupt Dropout Edge Case:** If the beacon drops entirely *before* reaching the threshold (e.g., walking behind a concrete wall), Pipit analyzes the recent RSSI history. If the trend was decreasing, Pipit infers a walk-away and enters an aggressive scanning state, firing the Lock payload the instant the beacon is visible again. If the trend was stable (e.g., phone reboots mid-ride), it assumes a sudden failure and safely ignores the drop.
 
 ### 3.3 RSSI Thresholds & Hysteresis
 To prevent rapid lock/unlock cycling when the user hovers near the proximity boundary, the unlock and lock thresholds are separated by a 10 dBm hysteresis gap:
@@ -88,7 +90,7 @@ Guillemot's `Immogen Proximity` GATT service exposes three characteristics:
 2.  **Management Command (Write, Authenticated Link):** Gated by the 6-digit BLE Pairing PIN. Receives administrative commands (e.g., `PROV`, `REVOKE`, `RENAME`, `SLOTS?`).
 3.  **Management Response (Notify):** Returns asynchronous responses to management commands. All responses are structured JSON (see Section 6).
 
-**MTU Negotiation:** Management commands (e.g., `PROV` with a 32-character hex key + name) can exceed the default 23-byte ATT MTU. Guillemot requests an MTU exchange to 128 bytes upon connection. Pipit and Whimbrel (Web Bluetooth) must also request a larger MTU before sending management commands.
+**MTU Negotiation:** The `SLOTS?` Management Response returns a JSON array containing all 4 slots, which can easily exceed 150 bytes. To accommodate this in a single BLE Notification without fragmentation, Guillemot requests an MTU exchange to **247 bytes** (the nRF52 maximum) upon connection. Note that Web Bluetooth handles MTU negotiation automatically based on the peripheral's request, so Whimbrel does not need an explicit MTU API call.
 
 ### 4.3 Payload Structure & Slot Identification
 The 14-byte command payload structure is: `[1-byte Prefix (AAD)] [4-byte Counter (AAD)] [1-byte Command (Ciphertext)] [8-byte MIC]`.
@@ -142,12 +144,12 @@ The `IDENTIFY` payload uses the same counter as lock/unlock (incrementing the sl
 | `SLOTS?` | ✓ | ✓ | ✓ (read-only fallback) |
 | `PROV:<any>` | ✓ | ✗ | ✗ |
 | `REVOKE:<any>` | ✓ | ✗ | ✗ |
-| `RENAME:<own slot>` | ✓ | ✓ | ✗ |
+| `RENAME:<own slot>` | ✓ | ✗ | ✗ |
 | `RENAME:<other slot>` | ✓ | ✗ | ✗ |
 | `SETPIN` | serial-only | serial-only | serial-only |
 | `RESETLOCK` | serial-only | serial-only | serial-only |
 
-**Guest access in practice:** Guest phones (Slot 2–3) provision via **unencrypted QR codes** (Section 7.1.1) and never learn the management PIN. They interact exclusively with the Unlock/Lock Command characteristic (Write Without Response, no SMP required). Their only management capability — renaming their own slot — requires the owner to share the PIN with them explicitly, which is an opt-in escalation rather than a default.
+**Guest access in practice:** Guest phones (Slot 2–3) provision via **unencrypted QR codes** (Section 7.1.1) and never learn the management PIN. They interact exclusively with the Unlock/Lock Command characteristic (Write Without Response, no SMP required). Guests have zero management write access, even to their own slot names.
 
 **Why not skip `IDENTIFY` and just use SMP bonds?** SMP bonds (LTK + IRK) are device-level — they prove "this phone paired before" but not "this phone owns Slot N." IRKs also break when the user clears Bluetooth data, re-pairs, or switches phones. The `IDENTIFY` command provides cryptographic proof of slot ownership that survives re-pairing and is unforgeable without the slot key.
 
@@ -162,7 +164,7 @@ Commands are accepted over two transports with different permission levels:
 |---|---|---|---|
 | `IDENTIFY` (14-byte AES-CCM payload) | N/A | Yes | Any slot |
 | `PROV:<slot>:<key>:<ctr>:[name]` | Yes | Yes | Owner only |
-| `RENAME:<slot>:<name>` | Yes | Yes | Owner (any slot) · Guest (own slot) |
+| `RENAME:<slot>:<name>` | Yes | Yes | Owner only |
 | `SLOTS?` | Yes | Yes | Any (incl. unidentified) |
 | `REVOKE:<slot>` | Yes | Yes | Owner only |
 | `SETPIN:<6digits>` | Yes | **No** (serial-only) | N/A |
@@ -278,7 +280,7 @@ Implementing this architecture requires targeted updates across all four project
 *   **Protocol Updates (`serial.js` / `api.js`):** Update the API wrappers to append device names to the `PROV` command, implement the `RENAME` command, and send `SETPIN` as plaintext digits instead of a hash.
 *   **BLE Management (`js/`):** Implement Web Bluetooth to connect to the new GATT service, request access to the `Management Command` characteristic (triggering the browser's native PIN prompt), and listen to `Management Response` notifications.
 *   **JSON Parsing:** Parse the JSON response from `SLOTS?` to populate the dashboard UI with slot IDs, usage status, and device names.
-*   **UI & QR Updates (`app.js` / `prov.js`):** Add text fields for Device Name during the "Add Phone" wizard. Add an "Edit Name" button next to active slots in the dashboard view. Implement Argon2id KDF + AES-CCM encryption for QR code generation. The QR payload must contain the salt, encrypted key, counter, slot, and name — but never the PIN.
+*   **UI & QR Updates (`app.js` / `prov.js`):** Add text fields for Device Name during the "Add Phone" wizard. Add an "Edit Name" button next to active slots in the dashboard view. Implement Argon2id KDF + AES-CCM encryption for QR code generation. The QR payload must contain the salt, encrypted key, counter, slot, and name — but never the PIN. *(Note: Since the native WebCrypto API lacks Argon2id support, Whimbrel requires a WebAssembly port like `argon2-browser` to derive the QR encryption key).*
 
 ---
 
@@ -713,7 +715,9 @@ Pipit detects the current phone's slot tier at launch (from the stored slot ID) 
     *   **Slot 0 (Uguisu):** Shown with a key icon (🔑) and the name "Uguisu".
         *   **iOS:** Non-interactive. A subtle label *"Manage via Whimbrel"* indicates USB management is not available on iOS.
         *   **Android:** A **three-dot menu (⋮)** with:
-            *   **Replace** — For swapping in a new physical Uguisu unit. Prompts the user to connect the new fob via USB-C OTG, then provisions a fresh Slot 0 key via CDC serial (`PROV:0:<new_key>:0:Uguisu`). The old fob is immediately locked out.
+            *   **Replace** — For swapping in a new physical Uguisu unit. This is an automated two-step flow:
+                1. Prompts the user to connect the new fob via USB-C OTG, and provisions the generated Slot 0 key into the new fob via CDC serial (`PROV:0:<new_key>:0:Uguisu`).
+                2. Pipit then automatically sends the same `PROV` command to Guillemot via the BLE Management Command characteristic to sync the scooter with the new fob. The old fob is immediately locked out.
             *   No Rename or Delete options. The hardware fob's name is always "Uguisu" and Slot 0 cannot be vacated.
 
     *   **Slot 1 (owner's own slot):** Shows the slot number and device name. **No three-dot menu** — the owner cannot replace or delete their own slot from here. Use "Transfer to New Phone" in the DEVICE section to migrate.
@@ -1032,7 +1036,7 @@ Flashes the Uguisu hardware fob firmware and provisions its Slot 0 key via USB O
 1.  The user connects the Uguisu fob (via its XIAO nRF52840 USB-C) to the Android phone via USB-C OTG cable.
 2.  Pipit opens a CDC serial connection using `usb-serial-for-android` and detects the Uguisu bootloader or serial console.
 3.  **Firmware flash:** Pipit sends the compiled firmware binary via the nRF52840's serial DFU protocol. Progress bar during transfer.
-4.  **Key provisioning:** After firmware flash (or if firmware is already current), Pipit can send serial commands to configure Uguisu's Slot 0 AES key. This is typically done during initial setup and matches the `PROV:0:<key>:0:Uguisu` command format.
+4.  **Key provisioning:** After firmware flash (or if firmware is already current), Pipit can send serial commands to configure Uguisu's Slot 0 AES key via the `PROV:0:<key>:0:Uguisu` command format. *(Note: To complete the pairing, Pipit must simultaneously send this same `PROV` command to Guillemot over BLE, as described in Section 10.5.1).*
 5.  On completion: *"Uguisu firmware updated and key provisioned."*
 
 ---
