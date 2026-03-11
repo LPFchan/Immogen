@@ -32,4 +32,7 @@ bool ccm_auth_decrypt(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], con
 
 bool constant_time_eq(const uint8_t* a, const uint8_t* b, size_t n);
 
+struct KeySlot; // Forward declaration
+bool verify_payload(const uint8_t ct[MSG_LEN], const uint8_t mic[MIC_LEN], const KeySlot slots[4], Payload& out_pl, uint8_t& out_slot_id);
+
 }  // namespace immo

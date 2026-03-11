@@ -1,4 +1,5 @@
 #include "immo_crypto.h"
+#include "immo_storage.h"
 #include <nrf_soc.h>
 #include <string.h>
 
@@ -224,6 +225,40 @@ bool constant_time_eq(const uint8_t* a, const uint8_t* b, size_t n) {
   uint8_t diff = 0;
   for (size_t i = 0; i < n; i++) diff |= (a[i] ^ b[i]);
   return diff == 0;
+}
+
+bool verify_payload(const uint8_t ct[MSG_LEN], const uint8_t mic[MIC_LEN], const KeySlot slots[MAX_KEY_SLOTS], Payload& out_pl, uint8_t& out_slot_id) {
+  const uint8_t prefix = ct[0];
+  const uint8_t slot_id = (prefix >> 4) & 0x03;
+  out_slot_id = slot_id;
+
+  const KeySlot& slot = slots[slot_id];
+  bool is_active = false;
+  for (int i = 0; i < 16; i++) {
+    if (slot.aes_key[i] != 0) {
+      is_active = true;
+      break;
+    }
+  }
+  if (!is_active) return false;
+
+  const uint32_t counter = static_cast<uint32_t>(ct[1] | (static_cast<uint32_t>(ct[2]) << 8) | (static_cast<uint32_t>(ct[3]) << 16) | (static_cast<uint32_t>(ct[4]) << 24));
+
+  uint8_t nonce[NONCE_LEN];
+  build_nonce(counter, nonce);
+
+  uint8_t msg[MSG_LEN];
+  uint8_t expected[MIC_LEN];
+  
+  if (!ccm_auth_decrypt(slot.aes_key, nonce, ct, MSG_LEN, 5, msg, expected)) return false;
+
+  if (!constant_time_eq(expected, mic, MIC_LEN)) return false;
+
+  out_pl.prefix = prefix;
+  out_pl.counter = counter;
+  out_pl.command = static_cast<Command>(msg[5]);
+  memcpy(out_pl.mic, mic, MIC_LEN);
+  return true;
 }
 
 }  // namespace immo

@@ -5,6 +5,13 @@
 namespace immo {
 
 static constexpr size_t DEFAULT_COUNTER_LOG_MAX_BYTES = 4096;
+static constexpr uint8_t MAX_KEY_SLOTS = 4;
+
+struct KeySlot {
+  uint8_t aes_key[16];
+  uint32_t counter;
+  char name[24];
+};
 
 struct CounterRecord {
   uint32_t counter;

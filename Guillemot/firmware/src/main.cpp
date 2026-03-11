@@ -29,8 +29,8 @@ bool g_locked = true;
 // Session identity tracking
 int8_t g_session_slot = -1; // -1 if not identified, 0-3 for key slot
 
-// Runtime key: loaded from flash (Whimbrel-provisioned) or compile-time default.
-uint8_t g_psk[16];
+// Runtime keys: loaded from flash (Whimbrel-provisioned)
+immo::KeySlot g_slots[immo::MAX_KEY_SLOTS];
 char g_smp_pin[7] = "000000";
 
 immo::CounterStore g_store(COUNTER_LOG_PATH, OLD_COUNTER_LOG_PATH, immo::DEFAULT_COUNTER_LOG_MAX_BYTES);
@@ -63,17 +63,17 @@ BLEUuid bleUuidUnlocked(uuidUnlocked);
 void update_advertising();
 
 bool on_provision_success(const uint8_t key[16], uint32_t counter) {
-  return immo::prov_write_and_verify(immo::DEFAULT_PROV_PATH, key, counter, g_store, g_psk);
+  return immo::prov_write_and_verify(immo::DEFAULT_PROV_PATH, key, counter, g_store, g_slots[1].aes_key);
 }
 
-static bool key_is_all_zeros() { return immo::is_key_blank(g_psk); }
+static bool key_is_all_zeros() { return immo::is_key_blank(g_slots[1].aes_key); }
 
 static void load_psk_from_storage() {
-  immo::prov_load_key_or_zero(immo::DEFAULT_PROV_PATH, g_psk);
+  memset(g_slots, 0, sizeof(g_slots));
+  immo::prov_load_key_or_zero(immo::DEFAULT_PROV_PATH, g_slots[1].aes_key); // Owner slot (1) for now
+  
   // NOTE: Assuming PIN is also stored or using a default. For simplicity, reading PIN from flash if possible,
   // but if SETPIN serial command is only way to set it, we might need to store it.
-  // Wait, the requirements say "The 6-digit PIN established during USB setup serves as the standard BLE Pairing PIN".
-  // I will add a simple file read for PIN.
   File f = InternalFS.open("/pin.txt", FILE_O_READ);
   if (f) {
     f.read(g_smp_pin, 6);
@@ -105,29 +105,7 @@ bool parse_payload_from_report(ble_gap_evt_adv_report_t* report, uint8_t ct[immo
   return true;
 }
 
-bool verify_payload(const uint8_t ct[immo::MSG_LEN], const uint8_t mic[immo::MIC_LEN], immo::Payload& out_pl) {
-  // Extract prefix and counter (first 5 bytes of ct, which are unencrypted AAD)
-  const uint8_t prefix = ct[0];
-  const uint32_t counter = static_cast<uint32_t>(ct[1] | (static_cast<uint32_t>(ct[2]) << 8) | (static_cast<uint32_t>(ct[3]) << 16) | (static_cast<uint32_t>(ct[4]) << 24));
-
-  uint8_t nonce[immo::NONCE_LEN];
-  immo::build_nonce(counter, nonce);
-
-  uint8_t msg[immo::MSG_LEN];
-  uint8_t expected[immo::MIC_LEN];
-  // 5 bytes AAD: prefix (1 byte) + counter (4 bytes)
-  if (!immo::ccm_auth_decrypt(g_psk, nonce, ct, immo::MSG_LEN, 5, msg, expected)) return false;
-
-  if (!immo::constant_time_eq(expected, mic, immo::MIC_LEN)) return false;
-
-  out_pl.prefix = prefix;
-  out_pl.counter = counter;
-  out_pl.command = static_cast<immo::Command>(msg[5]);
-  memcpy(out_pl.mic, mic, immo::MIC_LEN);
-  return true;
-}
-
-void handle_valid_command(const immo::Payload& pl) {
+void handle_valid_command(const immo::Payload& pl, uint8_t slot_id) {
   const uint32_t last = g_store.lastCounter();
   if (pl.counter <= last) return;
 
@@ -177,11 +155,12 @@ void scan_callback(ble_gap_evt_adv_report_t* report) {
   uint8_t ct[immo::MSG_LEN];
   uint8_t mic[immo::MIC_LEN];
   if (!parse_payload_from_report(report, ct, mic)) return;
-  if (key_is_all_zeros()) return;
+  if (key_is_all_zeros()) return; // Simplification, maybe slot 1 only
   
   immo::Payload pl{};
-  if (!verify_payload(ct, mic, pl)) return;
-  handle_valid_command(pl);
+  uint8_t slot_id;
+  if (!immo::verify_payload(ct, mic, g_slots, pl, slot_id)) return;
+  handle_valid_command(pl, slot_id);
 }
 
 void unlock_lock_write_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len) {
@@ -192,8 +171,9 @@ void unlock_lock_write_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint8
     memcpy(mic, data + immo::MSG_LEN, immo::MIC_LEN);
     
     immo::Payload pl{};
-    if (!verify_payload(ct, mic, pl)) return;
-    handle_valid_command(pl);
+    uint8_t slot_id;
+    if (!immo::verify_payload(ct, mic, g_slots, pl, slot_id)) return;
+    handle_valid_command(pl, slot_id);
 }
 
 void send_json_response(const JsonDocument& doc) {
