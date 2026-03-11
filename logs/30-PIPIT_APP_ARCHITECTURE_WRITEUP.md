@@ -104,17 +104,17 @@ The post-wake GATT path is near-instant. The dominant variable is OS scan delive
 
 ## 5. Provisioning & Key Management
 
-### 5.1 QR Code Provisioning
+### 5.1 QR Code Provisioning & Migration
 
-Pipit is provisioned by scanning a QR code displayed by **Whimbrel** (initial setup) or **another Pipit instance** (post-installation). The QR encodes:
+Pipit uses QR codes for two distinct scenarios: Initial Setup and Device Migration. The QR encodes the provisioning URI:
 
 ```
-immogen://prov?slot=<n>&key=<hex>&ctr=0&pin=<6digits>
+immogen://prov?slot=<n>&key=<hex>&ctr=<counter>&pin=<6digits>&name=<url_encoded_string>
 ```
 
-* QR codes provide a high-bandwidth, air-gapped transfer of root cryptographic keys — no pairing over an unencrypted BLE channel.
-* Slot keys and management PIN are stored strictly in hardware-backed keystores (**Android Keystore** / **iOS Keychain**) — never in plaintext storage.
-* The KMP shared module parses the provisioning URI. Both Whimbrel and Pipit can generate and display QR codes.
+* **High-Bandwidth, Air-Gapped Transfer:** QR codes safely move root keys without exposing them to unencrypted BLE sniffing.
+* **Strict Keystore usage:** Slot keys and the management PIN are stored strictly in hardware-backed keystores (**Android Keystore** / **iOS Keychain**).
+* **Device Migration:** When migrating to a new phone, Pipit displays a QR code containing the *current* counter value. The new phone scans it, and the old phone instantly deletes its local key. This transfers the credential perfectly without causing "Leapfrog" counter desyncs between two active phones.
 
 ### 5.2 Onboarding Flow (Whimbrel)
 
@@ -122,18 +122,19 @@ The initial provisioning is driven by Whimbrel over USB-C serial:
 
 1. Flash Guillemot firmware via USB-C DFU. *(Skippable for pre-flashed devices.)*
 2. Provision Uguisu (Slot 0): Generate key → flash to fob via serial → prompt disconnect.
-3. Provision Guillemot (Slot 0): Flash same key via serial. No management PIN set yet.
+3. Provision Guillemot (Slot 0): Flash same key via serial (`PROV:0:...:Uguisu Fob`). No management PIN set yet.
 4. "Add a phone key?" — if declined, onboarding complete.
-5. Set management PIN: User enters 6-digit PIN. Whimbrel sends PIN hash and provisions Slot 1 via serial.
+5. Set management PIN: User enters 6-digit PIN. Whimbrel sends PIN hash and provisions Slot 1 via serial (`PROV:1:...:iPhone`).
 6. Display QR code for the phone to scan (with obscure/reveal controls).
 
 ### 5.3 BLE Key Management (Post-Installation)
 
 Once a management PIN is set, Pipit can authenticate to Guillemot over BLE and perform:
 
-* **Query slot status:** Read all 4 slots — occupied/empty, last-seen counter values.
-* **Revoke a slot:** Zero PSK and reset counter, freeing it for re-provisioning.
-* **Provision new phone (Slots 1–3):** Generate key → write to empty slot on Guillemot → display QR for target phone.
+* **Query slot status:** Read all 4 slots via `SLOTS?`. Guillemot returns JSON containing the user-assigned `name` (e.g. "Jamie's iPhone"), occupied status, and last-seen counter value.
+* **Rename a slot:** Send `RENAME:<slot>:<name>` to update the friendly device name stored in Guillemot's flash without altering the AES key.
+* **Revoke a slot:** Zero PSK, reset counter, and clear the name string, freeing it for re-provisioning.
+* **Lost Phone Recovery:** Pipit queries `SLOTS?`, displays the friendly names of active devices, asks the user which device was lost, issues a `REVOKE` for that specific slot, and self-provisions into the newly vacated slot.
 * **Provision/replace Uguisu fob (Slot 0):** Generate key → write to Slot 0 over BLE → flash to fob via USB-C. **Android only** (USB OTG via `usb-serial-for-android`); iOS requires Whimbrel on a laptop.
 * **Change management PIN:** Requires current PIN.
 

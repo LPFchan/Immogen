@@ -76,9 +76,9 @@ The Whimbrel onboarding wizard:
 
 1. **Flash Guillemot firmware** via USB-C DFU. *(Skippable for pre-flashed devices.)*
 2. **Provision Uguisu (Slot 0):** Generate key → flash to fob via serial → prompt disconnect.
-3. **Provision Guillemot (Slot 0):** Flash same key via `PROV:0:<key>:<counter>`. No management PIN set — fob-only users manage slots exclusively via wired connection.
+3. **Provision Guillemot (Slot 0):** Flash same key via `PROV:0:<key>:<counter>:Uguisu Fob`. No management PIN set — fob-only users manage slots exclusively via wired connection.
 4. **"Add a phone key?"** — if declined, onboarding complete.
-5. **Set management PIN:** User enters 6-digit PIN. Whimbrel sends `SETPIN:<hash>` and `PROV:1:<key>:<counter>` via serial.
+5. **Set management PIN:** User enters 6-digit PIN. Whimbrel sends `SETPIN:<hash>` and `PROV:1:<key>:<counter>:iPhone` via serial.
 6. **Display QR code** (`immogen://prov?slot=1&key=<hex>&ctr=0&pin=<6digits>`) with obscure/reveal controls for the phone to scan.
 
 ### 3.2 Post-Installation Key Management (BLE)
@@ -133,11 +133,12 @@ USB-C serial via Whimbrel is the break-glass path for: all keys lost, PIN forgot
 
 | Command | Description |
 |---|---|
-| `PROV:<slot>:<key>:<counter>` | Provision a key into the specified slot |
-| `SETPIN:<hash>` | Set or update the management PIN hash |
-| `SLOTS?` | Query status of all 4 key slots |
-| `REVOKE:<slot>` | Zero a slot's PSK and reset its counter |
-| `RESETLOCK` | Clear brute-force lockout counter (recovery) |
+| `PROV:<slot>:<key>:<counter>:[name]` | Provision a key into the specified slot. `name` is an optional human-readable device name string (e.g. `PROV:1:A1B2...:0:iPhone`). |
+| `RENAME:<slot>:<name>` | Update the human-readable string associated with a slot without modifying the AES key or counter. |
+| `SETPIN:<hash>` | Set or update the management PIN hash. |
+| `SLOTS?` | Query status of all 4 key slots. Returns data in JSON format including slot ID, used status, last-seen counter, and device name. |
+| `REVOKE:<slot>` | Zero a slot's PSK, reset its counter, and clear its name string. |
+| `RESETLOCK` | Clear brute-force lockout counter (recovery). |
 
 ---
 

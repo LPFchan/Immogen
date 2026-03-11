@@ -55,3 +55,23 @@ To explicitly route payloads to the correct AES key and avoid brute-forcing decr
 *   **Lower 4 bits:** Command ID (`1` = Unlock, `2` = Lock).
 
 *Example:* `0x11` explicitly instructs Guillemot to pull the AES key for Slot 1 and execute Command 1 (Unlock).
+
+## 6. Key Backup, Restore, and Migration
+Exporting the raw symmetric AES-CCM key to be used concurrently on two different phones breaks the monotonic counter system, causing "Leapfrog Desyncs" where the phones continuously reject each other's payloads. To prevent this, raw key backups are explicitly avoided in favor of two distinct flows:
+
+### The "Migration" Flow (Happy Path)
+Used when a user is upgrading to a new phone and has both devices in hand. 
+1. The old phone generates a QR code containing its current Slot ID, AES Key, and current Counter value.
+2. The new phone scans the QR, adopts the credentials, and takes over the counter exactly where the old phone left off.
+3. The old phone instantly deletes the key from its local secure storage.
+*Result: Zero server dependency, instant transfer, no counter desyncs.*
+
+### The "Recovery" Flow (Break-Glass Path)
+Used when a phone is lost or destroyed. The user only needs their 6-digit BLE Pairing PIN.
+1. The user installs Pipit on a new phone, connects to Guillemot, and authenticates using the PIN.
+2. Pipit queries the slots (`SLOTS?`), and Guillemot returns a JSON array containing the user-assigned `name` (e.g. "Jamie's iPhone") and last-used counter for each slot.
+3. Pipit displays a UI: *"Which device did you lose?"*
+4. The user selects "Jamie's iPhone" (Slot 1).
+5. Pipit issues `REVOKE:1`, instantly locking out the stolen phone.
+6. Pipit then immediately provisions itself into that vacated slot via `PROV:1:<new_key>:0:New iPhone`.
+*Result: Securely locks out the old device and establishes a brand new cryptographic counter baseline for the new phone.*
