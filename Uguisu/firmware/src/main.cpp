@@ -37,13 +37,13 @@ static void prov_led_task(void*) {
   while (true) { led::prov_pulse(); }
 }
 
-void start_advertising_once(uint16_t company_id, const uint8_t payload13[immo::PAYLOAD_LEN]) {
+void start_advertising_once(uint16_t company_id, const uint8_t payload[immo::PAYLOAD_LEN]) {
   uint8_t msd[4 + immo::PAYLOAD_LEN];
   msd[0] = static_cast<uint8_t>(company_id & 0xFF);
   msd[1] = static_cast<uint8_t>((company_id >> 8) & 0xFF);
   msd[2] = static_cast<uint8_t>(immo::IMMOGEN_MAGIC & 0xFF);
   msd[3] = static_cast<uint8_t>((immo::IMMOGEN_MAGIC >> 8) & 0xFF);
-  memcpy(&msd[4], payload13, immo::PAYLOAD_LEN);
+  memcpy(&msd[4], payload, immo::PAYLOAD_LEN);
 
   Bluefruit.Advertising.stop();
   Bluefruit.Advertising.clearData();
@@ -131,19 +131,22 @@ void setup() {
   immo::build_nonce(counter, nonce);
 
   uint8_t msg[immo::MSG_LEN];
-  immo::build_msg(counter, command, msg);
+  // Prefix byte packing: Prefix = (Slot_ID << 4). Uguisu must pack 0x00 (Slot 0).
+  uint8_t prefix = 0x00;
+  immo::build_msg(prefix, counter, command, msg);
 
   uint8_t ct[immo::MSG_LEN];
   uint8_t mic[immo::MIC_LEN];
-  const bool ok = immo::ccm_auth_encrypt(g_psk, nonce, msg, sizeof(msg), 4, ct, mic);
+  // 5 bytes AAD: prefix (1 byte) + counter (4 bytes)
+  const bool ok = immo::ccm_auth_encrypt(g_psk, nonce, msg, sizeof(msg), 5, ct, mic);
   if (!ok) system_off();
 
-  uint8_t payload13[immo::PAYLOAD_LEN];
-  memcpy(&payload13[0], ct, sizeof(ct));
-  memcpy(&payload13[sizeof(ct)], mic, sizeof(mic));
+  uint8_t payload[immo::PAYLOAD_LEN];
+  memcpy(&payload[0], ct, sizeof(ct));
+  memcpy(&payload[sizeof(ct)], mic, sizeof(mic));
 
   g_store.update(counter);
-  start_advertising_once(MSD_COMPANY_ID, payload13);
+  start_advertising_once(MSD_COMPANY_ID, payload);
   const uint32_t adv_start = millis();
 
   if (low_bat) {

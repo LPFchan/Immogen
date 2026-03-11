@@ -37,9 +37,10 @@ void build_nonce(uint32_t counter, uint8_t nonce[NONCE_LEN]) {
   for (size_t i = 4; i < NONCE_LEN; i++) nonce[i] = 0;
 }
 
-void build_msg(uint32_t counter, Command command, uint8_t msg[MSG_LEN]) {
-  le32_write(&msg[0], counter);
-  msg[4] = static_cast<uint8_t>(command);
+void build_msg(uint8_t prefix, uint32_t counter, Command command, uint8_t msg[MSG_LEN]) {
+  msg[0] = prefix;
+  le32_write(&msg[1], counter);
+  msg[5] = static_cast<uint8_t>(command);
 }
 
 bool ccm_auth_encrypt(const uint8_t key[16], const uint8_t nonce[NONCE_LEN], const uint8_t* msg, size_t msg_len, size_t aad_len, uint8_t* out_ct, uint8_t out_mic[MIC_LEN]) {
