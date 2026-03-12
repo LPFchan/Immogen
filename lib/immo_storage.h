@@ -14,6 +14,7 @@ struct KeySlot {
 };
 
 struct CounterRecord {
+  uint8_t slot_id;
   uint32_t counter;
   uint32_t crc32;
 };
@@ -24,23 +25,17 @@ public:
 
   bool begin();
   
-  // Scans the log and populates internal state
+  // Scans the log and populates internal state for all slots
   void load();
 
-  // Returns the last counter seen. Returns 0 if never seen.
-  uint32_t lastCounter() const;
-
-  // For devices that need to load and return last counter (e.g. Uguisu).
-  uint32_t loadLast() {
-    load();
-    return last_counter_;
-  }
+  // Returns the last counter seen for the given slot. Returns 0 if never seen.
+  uint32_t lastCounter(uint8_t slot_id) const;
 
   // Appends a new counter record to the log
-  void update(uint32_t counter);
+  void update(uint8_t slot_id, uint32_t counter);
 
   // Replaces the entire log with a single record (useful during provisioning)
-  void seed(uint32_t counter);
+  void seed(uint8_t slot_id, uint32_t counter);
 
 private:
   void rotateIfNeeded_();
@@ -50,7 +45,7 @@ private:
   const char* old_log_path_;
   size_t max_bytes_;
 
-  uint32_t last_counter_;
+  uint32_t last_counters_[MAX_KEY_SLOTS];
 };
 
 }  // namespace immo

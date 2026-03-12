@@ -15,6 +15,7 @@ enum class Command : uint8_t {
   Unlock = 0x01,
   Lock = 0x02,
   Identify = 0x03,
+  Window = 0x04,
 };
 
 struct Payload {

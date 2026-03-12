@@ -131,7 +131,7 @@ Each key slot maintains an independent strictly-monotonic counter. Guillemot rej
 Management access is gated by two layers: **SMP authentication** (the phone knows the 6-digit PIN) and **slot identity** (the phone proves which slot it owns). SMP gets you through the door; `IDENTIFY` determines what you can do inside.
 
 **The `IDENTIFY` command:**
-At the start of any management session, the phone sends an `IDENTIFY` payload — a standard 14-byte AES-CCM packet (same format as lock/unlock, Section 4.3) with command byte `0x02`. The prefix byte carries the claimed slot ID. Guillemot decrypts the payload using the claimed slot's key:
+At the start of any management session, the phone sends an `IDENTIFY` payload — a standard 14-byte AES-CCM packet (same format as lock/unlock, Section 4.3) with command byte `0x03`. The prefix byte carries the claimed slot ID. Guillemot decrypts the payload using the claimed slot's key:
 *   **MIC valid + counter valid →** Session is bound to that slot. Guillemot stores a `session_slot` variable for the lifetime of the GATT connection.
 *   **MIC invalid →** Rejected. The session remains unbound and all subsequent management commands are refused.
 
@@ -177,7 +177,7 @@ Commands are accepted over two transports with different permission levels:
 | `SETPIN:<6digits>` | Yes | **No** (serial-only) | N/A |
 | `RESETLOCK` | Yes | **No** (serial-only) | N/A |
 
-`IDENTIFY` is sent as a 14-byte AES-CCM payload (same format as lock/unlock, command byte `0x02`) through the Management Command characteristic. It binds the BLE session to a slot and access tier (see Section 5.5). Must be sent before any standard write commands; only `SLOTS?` and `RECOVER` are allowed without identification.
+`IDENTIFY` is sent as a 14-byte AES-CCM payload (same format as lock/unlock, command byte `0x03`) through the Management Command characteristic. It binds the BLE session to a slot and access tier (see Section 5.5). Must be sent before any standard write commands; only `SLOTS?` and `RECOVER` are allowed without identification.
 
 `SETPIN` and `RESETLOCK` are restricted to USB-C serial because they are recovery/bootstrap operations. Exposing `RESETLOCK` over BLE would allow an attacker to clear brute-force lockout and keep attacking the PIN. `SETPIN` is serial-only to prevent remote PIN changes by a compromised phone.
 

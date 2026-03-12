@@ -59,26 +59,70 @@ void start_advertising_once(uint16_t company_id, const uint8_t payload[immo::PAY
   Bluefruit.Advertising.start(0);
 }
 
-// Waits for button press and release, returns press duration in ms.
-// Button is active LOW (INPUT_PULLUP). Returns 0 if timeout.
-static uint32_t wait_for_button_press_release(uint32_t timeout_ms) {
+// Waits for button press, detects short/long press and triple clicks.
+// Button is active LOW (INPUT_PULLUP). Returns immo::Command (Unlock, Lock, Window) or 0 on timeout.
+static uint8_t wait_for_button_command(uint32_t timeout_ms) {
   if (digitalRead(UGUISU_PIN_BUTTON) != LOW) {
     // Pin already HIGH. We woke from sleep but user already released.
-    // Treat as a very short press (Unlock).
-    return 1; 
+    return static_cast<uint8_t>(immo::Command::Unlock); 
   }
 
   const uint32_t deadline = millis() + timeout_ms;
-  const uint32_t press_start = millis();
+  uint8_t click_count = 0;
+  bool is_long_press = false;
+  uint32_t last_release_time = millis();
 
-  while (millis() < deadline && digitalRead(UGUISU_PIN_BUTTON) == LOW) {
-    if (millis() - press_start >= UGUISU_LONG_PRESS_MS) {
-      // Threshold reached, no need to wait for release
-      return UGUISU_LONG_PRESS_MS; 
+  while (millis() < deadline) {
+    if (digitalRead(UGUISU_PIN_BUTTON) == LOW) {
+      uint32_t press_start = millis();
+      bool released = false;
+      
+      while (millis() < deadline) {
+        if (digitalRead(UGUISU_PIN_BUTTON) != LOW) {
+           released = true;
+           break;
+        }
+        if (millis() - press_start >= UGUISU_LONG_PRESS_MS) {
+           is_long_press = true;
+           break;
+        }
+        delay(10);
+      }
+      
+      if (is_long_press) {
+         return static_cast<uint8_t>(immo::Command::Lock);
+      }
+      
+      if (released) {
+        click_count++;
+        last_release_time = millis();
+        // Wait for next press within a short window for double/triple clicks
+        bool next_press_detected = false;
+        uint32_t multi_click_deadline = millis() + 400; // 400ms window for next click
+        while (millis() < multi_click_deadline) {
+           if (digitalRead(UGUISU_PIN_BUTTON) == LOW) {
+              next_press_detected = true;
+              break;
+           }
+           delay(10);
+        }
+        
+        if (!next_press_detected) {
+            break; // No more clicks within window
+        }
+      }
+    } else {
+        delay(10);
     }
-    delay(10);
   }
-  return millis() - press_start;
+
+  if (click_count >= 3) {
+      return static_cast<uint8_t>(immo::Command::Window);
+  } else if (click_count > 0) {
+      return static_cast<uint8_t>(immo::Command::Unlock);
+  }
+
+  return 0; // Timeout, no valid command
 }
 
 }  // namespace
@@ -116,11 +160,11 @@ void setup() {
   Bluefruit.setName("Uguisu");
   Bluefruit.setTxPower(0);
 
-  // Wait for button: single press = Unlock, long press (>= 1s) = Lock
-  const uint32_t press_ms = wait_for_button_press_release(UGUISU_BUTTON_TIMEOUT_MS);
-  if (press_ms == 0) system_off();  // No press within timeout, sleep
-  const immo::Command command =
-      (press_ms >= UGUISU_LONG_PRESS_MS) ? immo::Command::Lock : immo::Command::Unlock;
+  // Wait for button: single press = Unlock, long press (>= 1s) = Lock, triple-press = Window
+  const uint8_t cmd_val = wait_for_button_command(UGUISU_BUTTON_TIMEOUT_MS);
+  if (cmd_val == 0) system_off();  // No press within timeout, sleep
+  
+  const immo::Command command = static_cast<immo::Command>(cmd_val);
   const uint8_t cmd_pin = (command == immo::Command::Lock) ? PIN_LED_R : PIN_LED_G;
   const bool low_bat = (readVbat_mv() < LED_LOWBAT_MV_THRESHOLD);
 
@@ -132,7 +176,7 @@ void setup() {
 
   uint8_t msg[immo::MSG_LEN];
   // Prefix byte packing: Prefix = (Slot_ID << 4). Uguisu must pack 0x00 (Slot 0).
-  uint8_t prefix = 0x00;
+  uint8_t prefix = (0 << 4);
   immo::build_msg(prefix, counter, command, msg);
 
   uint8_t ct[immo::MSG_LEN];
@@ -151,6 +195,13 @@ void setup() {
 
   if (low_bat) {
     led::flash_low_battery(cmd_pin);
+  } else if (command == immo::Command::Window) {
+    // Flash blue 3 times for Window command (or just use cmd_pin default, which would be green)
+    // Actually, cmd_pin above defaults to green for Window. Let's make it a special sequence.
+    for (int i = 0; i < 3; i++) {
+        led::flash_once(PIN_LED_B, 50, 100, 50);
+        delay(50);
+    }
   } else {
     led::flash_once(cmd_pin, LED_FLASH_RISE_MS, LED_FLASH_HOLD_MS, LED_FLASH_FALL_MS);
   }

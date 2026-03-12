@@ -90,7 +90,7 @@ Tier is implicit from slot number — no additional metadata stored.
 
 Guillemot can't determine which slot is connecting for management from SMP alone (SMP proves PIN knowledge, not slot identity). New command added:
 
-- Phone sends a 14-byte AES-CCM payload (same format as lock/unlock) with command byte `0x02` through the Management Command characteristic
+- Phone sends a 14-byte AES-CCM payload (same format as lock/unlock) with command byte `0x03` through the Management Command characteristic
 - Guillemot decrypts using the claimed slot's key — if MIC valid + counter valid, session is bound to that slot
 - All subsequent management commands are gated by the identified tier
 

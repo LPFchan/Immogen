@@ -17,22 +17,33 @@ uint32_t crc32_ieee(const uint8_t* data, size_t len) {
   return ~crc;
 }
 
-uint32_t record_crc(uint32_t counter) {
-  return crc32_ieee(reinterpret_cast<const uint8_t*>(&counter), sizeof(counter));
+uint32_t record_crc(uint8_t slot_id, uint32_t counter) {
+  uint8_t data[5];
+  data[0] = slot_id;
+  data[1] = static_cast<uint8_t>(counter & 0xFF);
+  data[2] = static_cast<uint8_t>((counter >> 8) & 0xFF);
+  data[3] = static_cast<uint8_t>((counter >> 16) & 0xFF);
+  data[4] = static_cast<uint8_t>((counter >> 24) & 0xFF);
+  return crc32_ieee(data, sizeof(data));
 }
 
 }  // namespace
 
 CounterStore::CounterStore(const char* log_path, const char* old_log_path, size_t max_bytes)
-  : log_path_(log_path), old_log_path_(old_log_path), max_bytes_(max_bytes),
-    last_counter_(0) {}
+  : log_path_(log_path), old_log_path_(old_log_path), max_bytes_(max_bytes) {
+    for (int i = 0; i < MAX_KEY_SLOTS; i++) {
+      last_counters_[i] = 0;
+    }
+}
 
 bool CounterStore::begin() {
   return InternalFS.begin();
 }
 
 void CounterStore::load() {
-  last_counter_ = 0;
+  for (int i = 0; i < MAX_KEY_SLOTS; i++) {
+    last_counters_[i] = 0;
+  }
   scan_file_(log_path_);
   scan_file_(old_log_path_);
 }
@@ -43,21 +54,25 @@ void CounterStore::scan_file_(const char* path) {
 
   CounterRecord rec{};
   while (f.read(reinterpret_cast<void*>(&rec), sizeof(rec)) == sizeof(rec)) {
-    if (record_crc(rec.counter) != rec.crc32) continue;
-    if (rec.counter > last_counter_) last_counter_ = rec.counter;
+    if (rec.slot_id >= MAX_KEY_SLOTS) continue;
+    if (record_crc(rec.slot_id, rec.counter) != rec.crc32) continue;
+    if (rec.counter > last_counters_[rec.slot_id]) last_counters_[rec.slot_id] = rec.counter;
   }
 }
 
-uint32_t CounterStore::lastCounter() const {
-  return last_counter_;
+uint32_t CounterStore::lastCounter(uint8_t slot_id) const {
+  if (slot_id >= MAX_KEY_SLOTS) return 0;
+  return last_counters_[slot_id];
 }
 
-void CounterStore::update(uint32_t counter) {
+void CounterStore::update(uint8_t slot_id, uint32_t counter) {
+  if (slot_id >= MAX_KEY_SLOTS) return;
   rotateIfNeeded_();
 
   CounterRecord rec{};
+  rec.slot_id = slot_id;
   rec.counter = counter;
-  rec.crc32 = record_crc(rec.counter);
+  rec.crc32 = record_crc(slot_id, counter);
 
   // FILE_O_WRITE in Adafruit LittleFS seeks to end (append), enabling power-loss recovery.
   Adafruit_LittleFS_Namespace::File f(InternalFS.open(log_path_, Adafruit_LittleFS_Namespace::FILE_O_WRITE));
@@ -65,13 +80,17 @@ void CounterStore::update(uint32_t counter) {
   f.write(reinterpret_cast<const uint8_t*>(&rec), sizeof(rec));
   f.flush();
 
-  last_counter_ = counter;
+  last_counters_[slot_id] = counter;
 }
 
-void CounterStore::seed(uint32_t counter) {
+void CounterStore::seed(uint8_t slot_id, uint32_t counter) {
+  if (slot_id >= MAX_KEY_SLOTS) return;
   InternalFS.remove(log_path_);
   InternalFS.remove(old_log_path_);
-  update(counter);
+  for (int i = 0; i < MAX_KEY_SLOTS; i++) {
+    last_counters_[i] = 0;
+  }
+  update(slot_id, counter);
 }
 
 void CounterStore::rotateIfNeeded_() {
